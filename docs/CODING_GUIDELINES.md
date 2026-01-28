@@ -179,11 +179,11 @@ func get_optional_value() -> Variant:
 # 1. Tool directive (if needed)
 @tool
 
-# 2. Class name
-class_name EntityName
-
-# 3. Extends clause
+# 2. Extends clause
 extends Node2D
+
+# 3. Class name
+class_name EntityName
 
 # 4. Documentation comments
 ## Brief description of the class
