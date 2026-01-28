@@ -1,0 +1,5 @@
+[gd_scene load_steps=1 format=3 uid="uid://b2yx8u8qkfnqv"]
+
+[node name="World" type="Node2D"]
+
+[node name="Camera2D" type="Camera2D" parent="."]
