@@ -1,0 +1,16 @@
+[gd_scene load_steps=2 format=3 uid="uid://bxwcxrsd0eubi"]
+
+[ext_resource type="Texture2D" uid="uid://bvp0hhlbna5jf" path="res://assets/backgrounds/01.png" id="1_48ca7"]
+
+[node name="WorldSegment" type="Node2D"]
+
+[node name="Background" type="Sprite2D" parent="."]
+texture = ExtResource("1_48ca7")
+
+[node name="Plane2" type="Node2D" parent="."]
+
+[node name="Animal2D_1" type="Sprite2D" parent="Plane2"]
+
+[node name="Plane1" type="Node2D" parent="."]
+
+[node name="Bush1" type="Sprite2D" parent="Plane1"]
