@@ -5,12 +5,16 @@
 [node name="WorldSegment" type="Node2D"]
 
 [node name="Background" type="Sprite2D" parent="."]
+z_index = -10
 texture = ExtResource("1_48ca7")
 
 [node name="Plane2" type="Node2D" parent="."]
+z_as_relative = false
 
 [node name="Animal2D_1" type="Sprite2D" parent="Plane2"]
 
 [node name="Plane1" type="Node2D" parent="."]
+z_index = 10
+z_as_relative = false
 
 [node name="Bush1" type="Sprite2D" parent="Plane1"]

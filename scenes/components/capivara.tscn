@@ -1,0 +1,24 @@
+[gd_scene load_steps=4 format=3 uid="uid://cqbwu75urmps8"]
+
+[ext_resource type="Script" uid="uid://dymxkx07niar6" path="res://scripts/animal.gd" id="1_brawi"]
+[ext_resource type="Texture2D" uid="uid://cpij14uqjch2l" path="res://assets/animals/capivara.png" id="2_f1wx2"]
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_12o72"]
+radius = 166.32025
+height = 634.8014
+
+[node name="Animal" type="Node2D"]
+script = ExtResource("1_brawi")
+current_plane = "plane1"
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture = ExtResource("2_f1wx2")
+
+[node name="Area2D" type="Area2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
+position = Vector2(-8.000002, -7.0000005)
+rotation = 0.9195622
+shape = SubResource("CapsuleShape2D_12o72")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]

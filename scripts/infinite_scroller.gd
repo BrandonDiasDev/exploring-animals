@@ -1,6 +1,6 @@
 extends Node2D
 
-@export var world_width := 2052.0
+@export var world_width := 3840.0
 @export var segment_scenes: Array[PackedScene] = []
 
 var segments := []
@@ -12,12 +12,10 @@ func _ready():
 		push_error("ERRO: Adicione pelo menos 1 segment_scene!")
 		return
 	
-	# Criar 3 segmentos iniciais
 	for i in range(3):
 		create_segment_at_offset(i - 1)
 
 func create_segment_at_offset(offset: int) -> void:
-	# Escolher qual sprite usar (alternando)
 	var scene_index = next_segment_index % segment_scenes.size()
 	var segment = segment_scenes[scene_index].instantiate()
 	
@@ -29,8 +27,31 @@ func create_segment_at_offset(offset: int) -> void:
 		"position_offset": offset
 	})
 	
+	# Restaurar estado dos animais
+	call_deferred("restore_segment_animals", segment)
+	
 	next_segment_index += 1
 	print("Segmento criado no offset ", offset, " usando sprite ", scene_index)
+
+func restore_segment_animals(segment):
+	await get_tree().process_frame
+	
+	var world_manager = get_parent()
+	if not world_manager.has_method("restore_animal_state"):
+		return
+	
+	var animals = []
+	find_animals_recursive(segment, animals)
+	
+	for animal in animals:
+		world_manager.restore_animal_state(animal)
+
+func find_animals_recursive(node, animals_array):
+	if node.is_in_group("animals"):
+		animals_array.append(node)
+	
+	for child in node.get_children():
+		find_animals_recursive(child, animals_array)
 
 func update_camera_position(new_camera_x: float) -> void:
 	camera_x = new_camera_x
@@ -40,31 +61,31 @@ func update_camera_position(new_camera_x: float) -> void:
 		var segment = segment_data.node
 		var distance = segment.position.x - camera_x
 		
-		# Se está muito à esquerda (jogador foi para direita)
 		if distance < -world_width:
-			# Destruir e recriar na direita com próxima sprite
+			# REMOVIDO: save_segment_animals(segment)
 			var rightmost_x = get_rightmost_segment_x()
 			recycle_segment(i, rightmost_x + world_width)
 		
-		# Se está muito à direita (jogador foi para esquerda)
 		elif distance > world_width * 2:
-			# Destruir e recriar na esquerda com próxima sprite
+			# REMOVIDO: save_segment_animals(segment)
 			var leftmost_x = get_leftmost_segment_x()
 			recycle_segment(i, leftmost_x - world_width)
 
+# FUNÇÃO REMOVIDA: save_segment_animals()
+
 func recycle_segment(index: int, new_x: float) -> void:
-	# Remover o segmento antigo
 	var old_segment = segments[index].node
 	old_segment.queue_free()
 	
-	# Criar novo segmento com próxima sprite
 	var scene_index = next_segment_index % segment_scenes.size()
 	var new_segment = segment_scenes[scene_index].instantiate()
 	new_segment.position.x = new_x
 	add_child(new_segment)
 	
-	# Atualizar referência
 	segments[index].node = new_segment
+	
+	# Restaurar estado dos animais
+	call_deferred("restore_segment_animals", new_segment)
 	
 	next_segment_index += 1
 	print("Segmento reciclado na posição ", new_x, " usando sprite ", scene_index)
