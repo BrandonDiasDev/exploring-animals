@@ -1,19 +1,23 @@
-[gd_scene load_steps=6 format=3 uid="uid://bdqhlfem7thcq"]
+[gd_scene load_steps=8 format=3 uid="uid://bdqhlfem7thcq"]
 
 [ext_resource type="Script" uid="uid://cxypjsug35i41" path="res://scripts/world_manager.gd" id="1_dphjl"]
 [ext_resource type="Script" uid="uid://dxn4jfxdjylsy" path="res://scripts/infinite_scroller.gd" id="2_1fp7r"]
 [ext_resource type="PackedScene" uid="uid://bxwcxrsd0eubi" path="res://scenes/world/world_segment.tscn" id="3_6m72w"]
 [ext_resource type="PackedScene" uid="uid://c43px4eeuf2it" path="res://scenes/world/world_segment_2.tscn" id="4_v5dby"]
+[ext_resource type="PackedScene" uid="uid://l7q234c8jywh" path="res://scenes/world/world_segment_3.tscn" id="5_t5ptc"]
 [ext_resource type="Script" uid="uid://bi1eq26pejj8j" path="res://scripts/plane_guide.gd" id="5_v5dby"]
+[ext_resource type="Texture2D" uid="uid://02gs1i3c0ftu" path="res://assets/backgrounds/Group 135.png" id="7_bq33v"]
 
 [node name="World" type="Node2D"]
 script = ExtResource("1_dphjl")
 
 [node name="Camera2D" type="Camera2D" parent="."]
+position = Vector2(960, 703)
 
 [node name="InfiniteScroller" type="Node2D" parent="."]
 script = ExtResource("2_1fp7r")
-segment_scenes = Array[PackedScene]([ExtResource("3_6m72w"), ExtResource("4_v5dby")])
+world_width = 1920.0
+segment_scenes = Array[PackedScene]([ExtResource("3_6m72w"), ExtResource("4_v5dby"), ExtResource("5_t5ptc")])
 
 [node name="PlaneGuide" type="CanvasLayer" parent="."]
 
@@ -30,6 +34,8 @@ script = ExtResource("5_v5dby")
 [node name="WorldContainer" type="Node2D" parent="."]
 
 [node name="Background" type="Sprite2D" parent="WorldContainer"]
+position = Vector2(-10685, -3618)
+texture = ExtResource("7_bq33v")
 
 [node name="Plane2" type="Node2D" parent="WorldContainer"]
 

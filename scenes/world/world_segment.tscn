@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3 uid="uid://bxwcxrsd0eubi"]
+[gd_scene load_steps=3 format=3 uid="uid://bxwcxrsd0eubi"]
 
-[ext_resource type="Texture2D" uid="uid://bvp0hhlbna5jf" path="res://assets/backgrounds/01.png" id="1_48ca7"]
+[ext_resource type="Texture2D" uid="uid://tj77c64vafqu" path="res://assets/backgrounds/green.png" id="1_48ca7"]
+[ext_resource type="PackedScene" uid="uid://cqbwu75urmps8" path="res://scenes/components/capivara.tscn" id="2_kgxi7"]
 
 [node name="WorldSegment" type="Node2D"]
 
@@ -11,10 +12,11 @@ texture = ExtResource("1_48ca7")
 [node name="Plane2" type="Node2D" parent="."]
 z_as_relative = false
 
-[node name="Animal2D_1" type="Sprite2D" parent="Plane2"]
-
 [node name="Plane1" type="Node2D" parent="."]
 z_index = 10
 z_as_relative = false
+
+[node name="Animal" parent="Plane1" instance=ExtResource("2_kgxi7")]
+position = Vector2(-599, 228)
 
 [node name="Bush1" type="Sprite2D" parent="Plane1"]
