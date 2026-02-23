@@ -2,6 +2,7 @@ extends Node2D
 class_name Bush
 
 signal animal_revealed(animal: Animal)
+signal bush_clicked
 
 @export var bush_name := "Arbusto"
 @export var is_revealed := false
@@ -89,6 +90,7 @@ func _process(delta):
 func on_click():
 	if is_revealed:
 		return
+	emit_signal("bush_clicked")
 	reveal_animal()
 
 func reveal_animal():

@@ -57,6 +57,14 @@ func reconnect_bush_signals(bush):
 		if bush.animal_revealed.is_connected(_on_bush_animal_revealed):
 			bush.animal_revealed.disconnect(_on_bush_animal_revealed)
 		bush.animal_revealed.connect(_on_bush_animal_revealed)
+	if bush.has_signal("bush_clicked"):
+		if bush.bush_clicked.is_connected(_on_bush_clicked):
+			bush.bush_clicked.disconnect(_on_bush_clicked)
+		bush.bush_clicked.connect(_on_bush_clicked)
+
+func _on_bush_clicked():
+	mouse_pressed = false
+	is_dragging = false
 
 func _on_bush_animal_revealed(animal: Animal):
 	"""Quando um animal sai de uma moita, conecta seus sinais e registra estado inicial"""
@@ -494,7 +502,6 @@ func reconnect_animal_signals(animal):
 		animal.animal_clicked.connect(_on_animal_clicked)
 
 func _on_animal_clicked(animal):
-	print("[CAM] animal_clicked:", animal.animal_name, " | is_dragging:", is_dragging, " >> zerando")
 	is_dragging = false
 	mouse_pressed = false
 	can_start_camera_drag = false
@@ -541,7 +548,6 @@ func _input(event):
 func _unhandled_input(event):
 	if is_animal_being_dragged:
 		if mouse_pressed or is_dragging:
-			print("[CAM] _unhandled: animal em drag -> resetando estado da câmera")
 			mouse_pressed = false
 			is_dragging = false
 		return
@@ -549,21 +555,16 @@ func _unhandled_input(event):
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
-				# Não inicia drag aqui — apenas registra o press.
-				# Drag só começa quando houver MOTION (veja abaixo).
-				print("[CAM] PRESS (pendente, aguard. motion) | is_animal_being_dragged:", is_animal_being_dragged)
 				mouse_pressed = true
 				last_mouse_pos = event.position
 	
 	elif event is InputEventMouseMotion and mouse_pressed:
 		if is_animal_being_dragged:
-			print("[CAM] MOTION cancelada: animal em drag")
 			mouse_pressed = false
 			is_dragging = false
 			return
 		
 		if not is_dragging:
-			print("[CAM] MOTION -> camera drag iniciado")
 			is_dragging = true
 		
 		var delta_x = event.position.x - last_mouse_pos.x
