@@ -139,7 +139,9 @@ func end_drag():
 	
 	emit_signal("animal_drag_ended", self)
 	
-	# Ver se o animal foi solto sobre uma moita
+	# Aguardar um frame de física para as sobreposições serem atualizadas
+	await get_tree().physics_frame
+	
 	var bush_result = _check_bush_drop()
 	if bush_result == "accepted" or bush_result == "rejected":
 		return  # A moita assume o controle a partir daqui
@@ -155,31 +157,18 @@ func _check_bush_drop() -> String:
 	var bushes = get_tree().get_nodes_in_group("bushes")
 	
 	if bushes.is_empty():
-		print("[BUSH DROP] Nenhuma moita na cena")
 		return ""
 	
-	var closest_bush = null
-	var closest_dist = INF
-	
 	for bush in bushes:
-		var dist = global_position.distance_to(bush.global_position)
+		var overlapping = area.overlaps_area(bush.area)
 		var occupied_str = "ocupada" if bush.is_occupied else "livre"
-		var inside = bush.is_position_inside(global_position)
 		print("[BUSH DROP] ", animal_name, " -> ", bush.name,
-			" animal:", "(%.0f,%.0f)" % [global_position.x, global_position.y],
-			" bush:", "(%.0f,%.0f)" % [bush.global_position.x, bush.global_position.y],
-			" dist:", "%.1f" % dist,
-			" inside:", inside,
+			" overlap:", overlapping,
 			" (", occupied_str, ")")
-		if inside and dist < closest_dist:
-			closest_dist = dist
-			closest_bush = bush
+		if overlapping:
+			var result = bush.try_accept_animal(self)
+			return "accepted" if result else "rejected"
 	
-	if closest_bush:
-		var result = closest_bush.try_accept_animal(self)
-		return "accepted" if result else "rejected"
-	
-	print("[BUSH DROP] Fora da área de todas as moitas")
 	return ""
 
 ## Chamado pela moita quando já tem um animal dentro.

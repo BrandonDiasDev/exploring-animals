@@ -5,8 +5,6 @@ signal animal_revealed(animal: Animal)
 
 @export var bush_name := "Arbusto"
 @export var is_revealed := false
-## Raio (px) em que um animal solto é capturado pela moita
-@export var hide_radius := 170.0
 
 @onready var bush_sprite: Sprite2D = $BushSprite
 @onready var area: Area2D = $Area2D
@@ -23,6 +21,8 @@ var mouse_captured := false
 func _ready():
 	add_to_group("bushes")
 	area.input_event.connect(_on_area_input_event)
+	# monitorable SEMPRE true: animais precisam detectar sobreposição com a moita
+	area.monitorable = true
 
 	# O animal padrão da cena já conta como ocupante
 	current_hidden_animal = hidden_animal
@@ -40,6 +40,9 @@ func _apply_hidden_state():
 		current_hidden_animal.visible = false
 		current_hidden_animal.is_hidden = true
 		current_hidden_animal.set_meta("managed_by_bush", true)
+		# Desabilitar monitoring para não interferir em overlap detection
+		if current_hidden_animal.has_node("Area2D"):
+			current_hidden_animal.get_node("Area2D").set_deferred("monitoring", false)
 
 func _apply_revealed_state():
 	if current_hidden_animal:
@@ -125,7 +128,16 @@ func reveal_animal():
 
 	if animal.has_meta("managed_by_bush"):
 		animal.remove_meta("managed_by_bush")
+
+	# Reabilitar o monitoring do animal para que overlaps_area funcione ao ser solto
+	if animal.has_node("Area2D"):
+		animal.get_node("Area2D").set_deferred("monitoring", true)
+
 	emit_signal("animal_revealed", animal)
+
+	# Reabilitar área: arbusto vazio precisa detectar um novo animal solto sobre ele
+	area.set_deferred("monitoring", true)
+	print("[BUSH] reveal completo, area.monitoring = true novamente")
 
 # ─── Esconder animal arrastado ────────────────────────────────────────────────
 
@@ -188,23 +200,6 @@ func _play_rejection(dropped_animal: Animal):
 	print("[BUSH] _play_rejection para:", dropped_animal.animal_name)
 	_shake_bush()
 	dropped_animal.bounce_away_from(global_position)
-
-## Retorna true se a posição global está dentro da área de collisão da moita.
-## Usa o CollisionShape2D real (retângulo) se disponível; fallback para hide_radius circular.
-func is_position_inside(gpos: Vector2) -> bool:
-	var col = area.get_node_or_null("CollisionShape2D")
-	if col and col.shape is RectangleShape2D:
-		var half = col.shape.size / 2.0
-		var center = global_position + col.position
-		var local = gpos - center
-		var inside = abs(local.x) <= half.x and abs(local.y) <= half.y
-		print("[BUSH RECT] center:", "(%.0f,%.0f)" % [center.x, center.y],
-			" half:", "(%.0f,%.0f)" % [half.x, half.y],
-			" animal_local:", "(%.1f,%.1f)" % [local.x, local.y],
-			" inside:", inside)
-		return inside
-	# Fallback circular
-	return gpos.distance_to(global_position) <= hide_radius
 
 func _shake_bush():
 	var orig = bush_sprite.position
