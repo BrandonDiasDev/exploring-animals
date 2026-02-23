@@ -75,17 +75,24 @@ func handle_mouse_release():
 	if not mouse_captured:
 		return
 	
+	var timer_snapshot = press_timer
+	var was_dragging = is_being_dragged
+	
 	mouse_captured = false
 	set_process_input(false)
 	
 	if is_pressed:
 		if press_timer < LONG_PRESS_TIME:
 			# Clique simples
+			print("[INPUT] ", animal_name, " >> CLICK | timer:", "%.3f" % timer_snapshot, " | was_dragging:", was_dragging)
 			on_click()
 		else:
 			# Long press - terminou o drag
-			if is_being_dragged:  # NOVO: Só terminar drag se realmente estava arrastando
+			if is_being_dragged:
+				print("[INPUT] ", animal_name, " >> DRAG END | timer:", "%.3f" % timer_snapshot, " | gpos:", global_position)
 				end_drag()
+			else:
+				print("[INPUT] ", animal_name, " >> LONG HOLD (sem drag) | timer:", "%.3f" % timer_snapshot)
 		is_pressed = false
 		press_timer = 0.0
 
@@ -124,7 +131,7 @@ func end_drag():
 	if not is_being_dragged:
 		return
 	
-	print("[DRAG END] Animal:", animal_name, "| pos:", position)
+	print("[DRAG END] Animal:", animal_name, " | gpos:", global_position)
 	is_being_dragged = false
 	
 	modulate = Color(1, 1, 1, 1)
@@ -132,12 +139,87 @@ func end_drag():
 	
 	emit_signal("animal_drag_ended", self)
 	
+	# Ver se o animal foi solto sobre uma moita
+	var bush_result = _check_bush_drop()
+	if bush_result == "accepted" or bush_result == "rejected":
+		return  # A moita assume o controle a partir daqui
+	
 	check_plane_change()
 	
 	# Save state after drag
 	var world_manager = get_tree().get_first_node_in_group("world_manager")
 	if world_manager and world_manager.has_method("save_animal_state"):
 		world_manager.save_animal_state(self)
+
+func _check_bush_drop() -> String:
+	var bushes = get_tree().get_nodes_in_group("bushes")
+	
+	if bushes.is_empty():
+		print("[BUSH DROP] Nenhuma moita na cena")
+		return ""
+	
+	var closest_bush = null
+	var closest_dist = INF
+	
+	for bush in bushes:
+		var dist = global_position.distance_to(bush.global_position)
+		var occupied_str = "ocupada" if bush.is_occupied else "livre"
+		var inside = bush.is_position_inside(global_position)
+		print("[BUSH DROP] ", animal_name, " -> ", bush.name,
+			" animal:", "(%.0f,%.0f)" % [global_position.x, global_position.y],
+			" bush:", "(%.0f,%.0f)" % [bush.global_position.x, bush.global_position.y],
+			" dist:", "%.1f" % dist,
+			" inside:", inside,
+			" (", occupied_str, ")")
+		if inside and dist < closest_dist:
+			closest_dist = dist
+			closest_bush = bush
+	
+	if closest_bush:
+		var result = closest_bush.try_accept_animal(self)
+		return "accepted" if result else "rejected"
+	
+	print("[BUSH DROP] Fora da área de todas as moitas")
+	return ""
+
+## Chamado pela moita quando já tem um animal dentro.
+## O animal quica para longe em um pequeno arco.
+func bounce_away_from(source_pos: Vector2):
+	var dir = (global_position - source_pos).normalized()
+	if dir == Vector2.ZERO:
+		dir = Vector2(randf_range(-1.0, 1.0), -0.5).normalized()
+	
+	var bounce_dist = randf_range(180.0, 260.0)
+	var arc_peak = global_position + dir * bounce_dist * 0.5 + Vector2(0, -90)
+	var target = global_position + dir * bounce_dist
+	
+	print("[BOUNCE] ", animal_name, " dir:", "(%.2f,%.2f)" % [dir.x, dir.y],
+		" dist:", "%.0f" % bounce_dist,
+		" from:", global_position, " to:", "(%.0f,%.0f)" % [target.x, target.y])
+	
+	# Pop de escala: feedback visual de rejeição
+	var scale_tween = create_tween()
+	scale_tween.tween_property(self, "scale", scale * 1.3, 0.07).set_ease(Tween.EASE_OUT)
+	scale_tween.tween_property(self, "scale", scale, 0.12) \
+		.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
+	
+	# Movimento em arco: sobe e vola para longe
+	var move_tween = create_tween()
+	move_tween.tween_property(self, "global_position", arc_peak, 0.18).set_ease(Tween.EASE_OUT)
+	move_tween.tween_property(self, "global_position", target, 0.22) \
+		.set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUART)
+	
+	await move_tween.finished
+	
+	print("[BOUNCE] ", animal_name, " pousou em:", global_position)
+	
+	# Ajustar plano e salvar estado na posição final
+	check_plane_change()
+	var world_manager = get_tree().get_first_node_in_group("world_manager")
+	if world_manager and world_manager.has_method("save_animal_state"):
+		world_manager.save_animal_state(self)
+	if world_manager and world_manager.has_method("notify_bounce_finished"):
+		world_manager.notify_bounce_finished(self)
 
 func check_plane_change():
 	var camera = get_viewport().get_camera_2d()

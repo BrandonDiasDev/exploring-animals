@@ -7,6 +7,7 @@ const DRAG_SPEED = 1.5
 
 var camera_position: float = 0.0
 var is_dragging := false
+var mouse_pressed := false  # Press confirmado, aguardando motion para virar drag
 var last_mouse_pos := Vector2.ZERO
 var is_animal_being_dragged := false
 var can_start_camera_drag := true
@@ -492,50 +493,84 @@ func reconnect_animal_signals(animal):
 	if animal.has_signal("animal_clicked"):
 		animal.animal_clicked.connect(_on_animal_clicked)
 
-func _on_animal_clicked(_animal):
+func _on_animal_clicked(animal):
+	print("[CAM] animal_clicked:", animal.animal_name, " | is_dragging:", is_dragging, " >> zerando")
 	is_dragging = false
+	mouse_pressed = false
 	can_start_camera_drag = false
 	await get_tree().process_frame
 	can_start_camera_drag = true
 
-func _on_animal_drag_started(_animal):
+func _on_animal_drag_started(animal):
+	print("[CAM] drag_started:", animal.animal_name, " | is_dragging antes:", is_dragging)
 	is_animal_being_dragged = true
 	is_dragging = false
+	mouse_pressed = false
 	can_start_camera_drag = false
 
 func _on_animal_drag_ended(animal):
+	print("[CAM] drag_ended:", animal.animal_name, " | is_animal_being_dragged permanece true por 0.15s")
 	is_dragging = false
-	await get_tree().create_timer(0.15).timeout
+	# Não liberar aqui — notify_bounce_finished() irá liberar após bounce (se houver)
+	# O timer de segurança garante que mesmo sem bounce, a flag é liberada
+	var timer = get_tree().create_timer(0.5)  # Aumentado para cobrir bounce (0.40s)
+	timer.timeout.connect(func(): 
+		if is_animal_being_dragged:
+			print("[CAM] drag_ended timer expirou -> is_animal_being_dragged = false")
+			is_animal_being_dragged = false
+	)
+
+func notify_bounce_finished(animal):
+	"""Chamado pelo animal após bounce_away_from terminar"""
+	print("[CAM] bounce_finished:", animal.animal_name, " -> is_animal_being_dragged = false")
 	is_animal_being_dragged = false
+
+func _input(event):
+	# Sempre limpar estado de drag ao soltar o mouse — mesmo que o release tenha sido
+	# consumido por animal/arbusto via set_input_as_handled(). Sem isso, mouse_pressed
+	# ficaria preso true e o próximo movimento de mouse arrastaria a câmera.
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if not event.pressed:
+			if mouse_pressed and not is_dragging:
+				print("[CAM] _input RELEASE (clique, sem drag) -> reset")
+			elif is_dragging:
+				print("[CAM] _input RELEASE (fim drag câmera) -> reset")
+			mouse_pressed = false
+			is_dragging = false
 
 func _unhandled_input(event):
 	if is_animal_being_dragged:
-		if is_dragging:
+		if mouse_pressed or is_dragging:
+			print("[CAM] _unhandled: animal em drag -> resetando estado da câmera")
+			mouse_pressed = false
 			is_dragging = false
 		return
 	
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
-				is_dragging = true
+				# Não inicia drag aqui — apenas registra o press.
+				# Drag só começa quando houver MOTION (veja abaixo).
+				print("[CAM] PRESS (pendente, aguard. motion) | is_animal_being_dragged:", is_animal_being_dragged)
+				mouse_pressed = true
 				last_mouse_pos = event.position
-			else:
-				if is_dragging:
-					is_dragging = false
 	
-	elif event is InputEventMouseMotion and is_dragging:
+	elif event is InputEventMouseMotion and mouse_pressed:
 		if is_animal_being_dragged:
+			print("[CAM] MOTION cancelada: animal em drag")
+			mouse_pressed = false
 			is_dragging = false
 			return
+		
+		if not is_dragging:
+			print("[CAM] MOTION -> camera drag iniciado")
+			is_dragging = true
 		
 		var delta_x = event.position.x - last_mouse_pos.x
 		camera_position -= delta_x * DRAG_SPEED
 		last_mouse_pos = event.position
 
 func _process(delta: float):
-	if is_animal_being_dragged and is_dragging:
-		is_dragging = false
-	
 	camera.position.x = lerp(camera.position.x, camera_position, delta * 10.0)
 	
 	if infinite_scroller:
