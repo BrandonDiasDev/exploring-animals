@@ -12,6 +12,7 @@ var is_animal_being_dragged := false
 var can_start_camera_drag := true
 
 var animals_state := {}
+var bushes_state := {}
 var world_width: float = 0.0
 
 func _ready():
@@ -28,6 +29,7 @@ func _ready():
 		world_width = 1920.0
 	
 	connect_animal_signals()
+	connect_bush_signals()
 
 func connect_animal_signals():
 	await get_tree().process_frame
@@ -41,6 +43,75 @@ func connect_animal_signals():
 			animal.animal_drag_ended.connect(_on_animal_drag_ended)
 		if animal.has_signal("animal_clicked"):
 			animal.animal_clicked.connect(_on_animal_clicked)
+
+func connect_bush_signals():
+	await get_tree().process_frame
+	
+	var bushes = get_tree().get_nodes_in_group("bushes")
+	for bush in bushes:
+		reconnect_bush_signals(bush)
+
+func reconnect_bush_signals(bush):
+	if bush.has_signal("animal_revealed"):
+		if bush.animal_revealed.is_connected(_on_bush_animal_revealed):
+			bush.animal_revealed.disconnect(_on_bush_animal_revealed)
+		bush.animal_revealed.connect(_on_bush_animal_revealed)
+
+func _on_bush_animal_revealed(animal: Animal):
+	"""Quando um animal sai de uma moita, conecta seus sinais e registra estado inicial"""
+	reconnect_animal_signals(animal)
+	# Salva estado inicial para que sobreviva à reciclagem do segmento
+	var animal_id = get_animal_unique_id(animal)
+	if not animals_state.has(animal_id):
+		var segment = get_segment_for_animal(animal)
+		if segment:
+			animals_state[animal_id] = {
+				"plane": animal.current_plane,
+				"scene_index": segment.get_meta("scene_index", -1),
+				"local_position": animal.position,
+				"scale": animal.scale,
+				"is_hidden": false
+			}
+			animals_state[animal_id + "_active_node"] = animal
+			print("[BUSH REVEAL] Registered animal:", animal_id)
+
+# ─── Estado das moitas ──────────────────────────────────────────────────────────
+
+func get_bush_unique_id(bush) -> String:
+	return "bush/" + bush.name
+
+func save_bush_state(bush):
+	var bush_id = get_bush_unique_id(bush)
+	var segment = get_node_or_null_in_parents(bush)
+	if not segment:
+		return
+	bushes_state[bush_id] = {
+		"is_revealed": bush.is_revealed,
+		"scene_index": segment.get_meta("scene_index", -1)
+	}
+
+func restore_bush_state(bush):
+	var bush_id = get_bush_unique_id(bush)
+	if not bushes_state.has(bush_id):
+		connect_bush_signals_for(bush)
+		return
+	var state = bushes_state[bush_id]
+	if state["is_revealed"]:
+		bush.is_revealed = true
+		bush._apply_revealed_state()
+	connect_bush_signals_for(bush)
+
+func connect_bush_signals_for(bush):
+	reconnect_bush_signals(bush)
+
+func get_node_or_null_in_parents(node) -> Node2D:
+	"""Retorna o segmento pai do nó (filho direto do InfiniteScroller)"""
+	var current = node.get_parent()
+	while current:
+		if current.get_parent() == infinite_scroller:
+			return current
+		current = current.get_parent()
+	return null
 
 
 
@@ -58,6 +129,10 @@ func get_segment_for_animal(animal) -> Node2D:
 	return null
 
 func save_animal_state(animal):
+	# Animais ainda dentro de uma moita são gerenciados pela moita, não por aqui
+	if animal.has_meta("managed_by_bush"):
+		return
+	
 	var animal_id = get_animal_unique_id(animal)
 	
 	if not animal.visible:

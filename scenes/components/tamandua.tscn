@@ -1,0 +1,24 @@
+[gd_scene load_steps=4 format=3 uid="uid://brjgm5r7cqny8"]
+
+[ext_resource type="Script" uid="uid://dymxkx07niar6" path="res://scripts/animal.gd" id="1_tdua1"]
+[ext_resource type="Texture2D" uid="uid://bfoiq1ee5ed8n" path="res://assets/animals/tamanduá.png" id="2_tdua2"]
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_tdua3"]
+radius = 161.0
+height = 1119.9825
+
+[node name="Tamandua" type="Node2D"]
+script = ExtResource("1_tdua1")
+animal_name = "Tamanduá"
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture = ExtResource("2_tdua2")
+
+[node name="Area2D" type="Area2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
+position = Vector2(-24, 28)
+rotation = 1.729132
+shape = SubResource("CapsuleShape2D_tdua3")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="."]

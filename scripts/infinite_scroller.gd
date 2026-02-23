@@ -54,13 +54,29 @@ func restore_segment_animals(segment):
 	# Then check if we need to create an animal that belongs to this scene
 	if world_manager.has_method("check_and_create_missing_animal"):
 		world_manager.check_and_create_missing_animal(segment)
+	
+	# Restaurar estado das moitas
+	var bushes = []
+	find_bushes_recursive(segment, bushes)
+	for bush in bushes:
+		if world_manager.has_method("restore_bush_state"):
+			world_manager.restore_bush_state(bush)
 
 func find_animals_recursive(node, animals_array):
 	if node.is_in_group("animals"):
 		animals_array.append(node)
-	
+	# Não entrar dentro de uma moita — o animal escondido é gerenciado pela moita
+	if node.is_in_group("bushes"):
+		return
 	for child in node.get_children():
 		find_animals_recursive(child, animals_array)
+
+func find_bushes_recursive(node, bushes_array):
+	if node.is_in_group("bushes"):
+		bushes_array.append(node)
+		return  # Não descer para dentro do arbusto
+	for child in node.get_children():
+		find_bushes_recursive(child, bushes_array)
 
 func save_segment_animals(segment):
 	"""Save state of all animals before segment is destroyed"""
@@ -128,6 +144,13 @@ func recycle_segment(index: int, new_x: float) -> void:
 		# Clear active reference so next instance can become active
 		if world_manager and world_manager.has_method("clear_active_animal"):
 			world_manager.clear_active_animal(animal)
+	
+	# Salvar estado das moitas
+	var bushes_before = []
+	find_bushes_recursive(old_segment, bushes_before)
+	for bush in bushes_before:
+		if world_manager and world_manager.has_method("save_bush_state"):
+			world_manager.save_bush_state(bush)
 	
 	old_segment.queue_free()
 	

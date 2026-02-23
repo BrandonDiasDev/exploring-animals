@@ -1,0 +1,24 @@
+[gd_scene load_steps=5 format=3 uid="uid://ck605vpg4glho"]
+
+[ext_resource type="Script" uid="uid://dxowuprhe2wap" path="res://scripts/bush.gd" id="1_bush1"]
+[ext_resource type="Texture2D" uid="uid://b6c3ei44de8fe" path="res://assets/vegetation/arbusto01.png" id="2_bush2"]
+[ext_resource type="PackedScene" uid="uid://brjgm5r7cqny8" path="res://scenes/components/tamandua.tscn" id="3_bush3"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_bush4"]
+size = Vector2(571, 485)
+
+[node name="Bush" type="Node2D"]
+script = ExtResource("1_bush1")
+
+[node name="BushSprite" type="Sprite2D" parent="."]
+texture = ExtResource("2_bush2")
+
+[node name="Area2D" type="Area2D" parent="."]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
+position = Vector2(7.5, 8.5)
+shape = SubResource("RectangleShape2D_bush4")
+
+[node name="HiddenAnimal" parent="." instance=ExtResource("3_bush3")]
+z_index = 1
+position = Vector2(-20, 4)
