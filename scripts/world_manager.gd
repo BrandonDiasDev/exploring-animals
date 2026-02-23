@@ -533,15 +533,8 @@ func notify_bounce_finished(animal):
 	is_animal_being_dragged = false
 
 func _input(event):
-	# Sempre limpar estado de drag ao soltar o mouse — mesmo que o release tenha sido
-	# consumido por animal/arbusto via set_input_as_handled(). Sem isso, mouse_pressed
-	# ficaria preso true e o próximo movimento de mouse arrastaria a câmera.
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if not event.pressed:
-			if mouse_pressed and not is_dragging:
-				print("[CAM] _input RELEASE (clique, sem drag) -> reset")
-			elif is_dragging:
-				print("[CAM] _input RELEASE (fim drag câmera) -> reset")
 			mouse_pressed = false
 			is_dragging = false
 
@@ -557,6 +550,9 @@ func _unhandled_input(event):
 			if event.pressed:
 				mouse_pressed = true
 				last_mouse_pos = event.position
+			else:
+				mouse_pressed = false
+				is_dragging = false
 	
 	elif event is InputEventMouseMotion and mouse_pressed:
 		if is_animal_being_dragged:

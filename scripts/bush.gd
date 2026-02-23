@@ -74,7 +74,8 @@ func _input(event):
 			if is_pressed and press_timer < LONG_PRESS_TIME:
 				on_click()
 			_reset_input_state()
-			get_viewport().set_input_as_handled()
+			# NAO chama set_input_as_handled() no release:
+			# o world_manager precisa ver este release para resetar o drag da camera
 
 func _reset_input_state():
 	is_pressed = false
