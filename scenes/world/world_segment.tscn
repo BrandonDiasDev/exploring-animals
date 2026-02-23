@@ -16,7 +16,7 @@ z_as_relative = false
 z_index = 10
 z_as_relative = false
 
-[node name="Animal" parent="Plane1" instance=ExtResource("2_kgxi7")]
-position = Vector2(-599, 228)
+[node name="Capivara" parent="Plane1" instance=ExtResource("2_kgxi7")]
+position = Vector2(-524, 215)
 
 [node name="Bush1" type="Sprite2D" parent="Plane1"]

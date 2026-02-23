@@ -31,8 +31,10 @@ func _ready():
 	if is_hidden:
 		visible = false
 	
-	# NOVO: Validar que escala e z-index estão consistentes com o plano
 	_sync_visual_to_plane()
+	
+	# LOG DIAGNOSTICO: confirma que o animal foi criado e a Area2D existe
+	print("[ANIMAL READY] ", animal_name, " | global_pos:", global_position, " | area monitoring:", area.monitoring, " | visible:", visible)
 
 func _sync_visual_to_plane():
 	"""Garantir que propriedades visuais correspondem ao plano atual"""
@@ -48,11 +50,16 @@ func _sync_visual_to_plane():
 			scale = expected_scale
 
 func _on_area_input_event(_viewport, event: InputEvent, _shape_idx):
+	# LOG DIAGNOSTICO: mostra cada evento que chega na Area2D
+	if event is InputEventMouseButton:
+		print("[AREA INPUT] ", animal_name, " | button:", event.button_index, " | pressed:", event.pressed, " | pos:", event.position)
+	
 	if is_hidden:
 		return
 	
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
+			print("[AREA CLICK DETECTED] ", animal_name, " | global_pos:", global_position)
 			is_pressed = true
 			press_timer = 0.0
 			mouse_captured = true

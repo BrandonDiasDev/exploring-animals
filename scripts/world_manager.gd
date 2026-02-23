@@ -9,7 +9,7 @@ var camera_position: float = 0.0
 var is_dragging := false
 var last_mouse_pos := Vector2.ZERO
 var is_animal_being_dragged := false
-var can_start_camera_drag := true  # NOVO
+var can_start_camera_drag := true
 
 var animals_state := {}
 var world_width: float = 0.0

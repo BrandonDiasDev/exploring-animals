@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3 uid="uid://l7q234c8jywh"]
+[gd_scene load_steps=3 format=3 uid="uid://l7q234c8jywh"]
 
 [ext_resource type="Texture2D" uid="uid://cn3bp8tfvsvbc" path="res://assets/backgrounds/red.png" id="1_ueges"]
+[ext_resource type="PackedScene" uid="uid://b5ramccl7s4at" path="res://scenes/components/ema.tscn" id="2_inm2u"]
 
 [node name="WorldSegment" type="Node2D"]
 
@@ -8,5 +9,8 @@
 texture = ExtResource("1_ueges")
 
 [node name="Plane2" type="Node2D" parent="."]
+
+[node name="Ema" parent="Plane2" instance=ExtResource("2_inm2u")]
+position = Vector2(544, -581)
 
 [node name="Plane1" type="Node2D" parent="."]

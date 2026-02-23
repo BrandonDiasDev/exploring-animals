@@ -40,8 +40,8 @@ func create_segment_at_offset(offset: int) -> void:
 func restore_segment_animals(segment):
 	await get_tree().process_frame
 	
-	var world_manager = get_parent()
-	if not world_manager.has_method("restore_animal_state"):
+	var world_manager = get_tree().get_first_node_in_group("world_manager")
+	if not world_manager or not world_manager.has_method("restore_animal_state"):
 		return
 	
 	# First, restore any animals that already exist in the segment
@@ -64,8 +64,8 @@ func find_animals_recursive(node, animals_array):
 
 func save_segment_animals(segment):
 	"""Save state of all animals before segment is destroyed"""
-	var world_manager = get_parent()
-	if not world_manager.has_method("save_animal_state"):
+	var world_manager = get_tree().get_first_node_in_group("world_manager")
+	if not world_manager or not world_manager.has_method("save_animal_state"):
 		return
 	
 	var animals = []
@@ -121,12 +121,12 @@ func recycle_segment(index: int, new_x: float) -> void:
 	print("[SEGMENT RECYCLE] Destroying scene_index:", old_scene_index, "| animals:", animals_before.size())
 	
 	# Save animal states preserving their WORLD positions
-	var world_manager = get_parent()
+	var world_manager = get_tree().get_first_node_in_group("world_manager")
 	for animal in animals_before:
-		if world_manager.has_method("save_animal_state_for_recycle"):
+		if world_manager and world_manager.has_method("save_animal_state_for_recycle"):
 			world_manager.save_animal_state_for_recycle(animal)
 		# Clear active reference so next instance can become active
-		if world_manager.has_method("clear_active_animal"):
+		if world_manager and world_manager.has_method("clear_active_animal"):
 			world_manager.clear_active_animal(animal)
 	
 	old_segment.queue_free()
