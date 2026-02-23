@@ -6,6 +6,7 @@
 [node name="WorldSegment" type="Node2D"]
 
 [node name="Background" type="Sprite2D" parent="."]
+scale = Vector2(1, 1.5)
 texture = ExtResource("1_ueges")
 
 [node name="Plane2" type="Node2D" parent="."]
