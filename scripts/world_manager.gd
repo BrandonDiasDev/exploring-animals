@@ -418,6 +418,7 @@ func reconnect_animal_signals(animal):
 		animal.animal_clicked.connect(_on_animal_clicked)
 
 func _on_animal_clicked(_animal):
+	is_dragging = false
 	can_start_camera_drag = false
 	await get_tree().process_frame
 	can_start_camera_drag = true
@@ -432,7 +433,7 @@ func _on_animal_drag_ended(animal):
 	await get_tree().create_timer(0.15).timeout
 	is_animal_being_dragged = false
 
-func _input(event):
+func _unhandled_input(event):
 	if is_animal_being_dragged:
 		if is_dragging:
 			is_dragging = false
