@@ -241,10 +241,21 @@ func restore_bush_state(bush):
 					print("[RESTORE BUSH] ", bush.name, " -> sem active_node para ", saved_hidden_id, ", será recriado por check_and_create")
 			elif animals_state.has(hidden_id):
 				var saved_scene_index = animals_state[hidden_id].get("scene_index", -1)
-				if saved_scene_index == this_scene_index:
-					# Estado pertence a este segmento — nativo pode reclamar o slot
+				var saved_is_hidden = animals_state[hidden_id].get("is_hidden", false)
+				if saved_scene_index == this_scene_index and saved_is_hidden:
+					# Estado pertence a este segmento E animal está escondido — nativo pode reclamar o slot
 					animals_state[hidden_id + "_active_node"] = hidden
-					print("[RESTORE BUSH] ", bush.name, " -> active node set for ", hidden_id, " (scene match)")
+					print("[RESTORE BUSH] ", bush.name, " -> active node set for ", hidden_id, " (scene match, is_hidden:true)")
+				elif saved_scene_index == this_scene_index and not saved_is_hidden:
+					# Animal está LIVRE (is_hidden:false) — o bush foi revelado mas is_revealed não foi salvo corretamente.
+					# Descartar nativo e tratar bush como revelado para que check_and_create_missing restaure o animal livre.
+					print("[RESTORE BUSH] ", bush.name, " -> descartando nativo ", hidden_id,
+						": estado salvo is_hidden:false (animal está livre)")
+					hidden.queue_free()
+					bush.current_hidden_animal = null
+					bush.is_revealed = true
+					bush.is_occupied = false
+					bush.area.set_deferred("monitoring", true)
 				else:
 					# Estado pertence a outro segmento: usuário arrastou o animal para outra moita.
 					# Este nativo é uma cópia obsoleta — descartá-lo para não bloquear o animal real.

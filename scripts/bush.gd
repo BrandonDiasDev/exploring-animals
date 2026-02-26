@@ -161,6 +161,10 @@ func reveal_animal():
 
 	emit_signal("animal_revealed", animal)
 
+	# Arbusto agora está vazio: resetar is_revealed para que cliques futuros
+	# (ex: tremidinha de arbusto vazio) funcionem normalmente
+	is_revealed = false
+
 	# Reabilitar área: arbusto vazio precisa detectar um novo animal solto sobre ele
 	area.set_deferred("monitoring", true)
 	print("[BUSH] reveal completo, area.monitoring = true novamente")
