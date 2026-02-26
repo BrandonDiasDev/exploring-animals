@@ -1,13 +1,13 @@
 [gd_scene load_steps=3 format=3 uid="uid://l7q234c8jywh"]
 
-[ext_resource type="Texture2D" uid="uid://cn3bp8tfvsvbc" path="res://assets/backgrounds/red.png" id="1_ueges"]
+[ext_resource type="Texture2D" uid="uid://buhr56lrw4bce" path="res://assets/backgrounds/red-day.png" id="1_inm2u"]
 [ext_resource type="PackedScene" uid="uid://b5ramccl7s4at" path="res://scenes/components/ema.tscn" id="2_inm2u"]
 
 [node name="WorldSegment" type="Node2D"]
 
 [node name="Background" type="Sprite2D" parent="."]
 scale = Vector2(1, 1.5)
-texture = ExtResource("1_ueges")
+texture = ExtResource("1_inm2u")
 
 [node name="Plane2" type="Node2D" parent="."]
 

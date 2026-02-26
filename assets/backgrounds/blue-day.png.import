@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://tj77c64vafqu"
-path="res://.godot/imported/green.png-5afc4ae2c76c749f528f2c0ab6e2e34d.ctex"
+uid="uid://bp3pxthheqdky"
+path="res://.godot/imported/blue-day.png-39e323f91c6c6088552819ecfbd7b4e1.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/backgrounds/green.png"
-dest_files=["res://.godot/imported/green.png-5afc4ae2c76c749f528f2c0ab6e2e34d.ctex"]
+source_file="res://assets/backgrounds/blue-day.png"
+dest_files=["res://.godot/imported/blue-day.png-39e323f91c6c6088552819ecfbd7b4e1.ctex"]
 
 [params]
 

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://br087ub11qtvv"
-path="res://.godot/imported/02.png-2e5449902cae9b411b347bfc32d0d936.ctex"
+uid="uid://c4gnjduiinvj4"
+path="res://.godot/imported/green-day.png-ec20b75a43389e61b078bcdd178b82d9.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/backgrounds/02.png"
-dest_files=["res://.godot/imported/02.png-2e5449902cae9b411b347bfc32d0d936.ctex"]
+source_file="res://assets/backgrounds/green-day.png"
+dest_files=["res://.godot/imported/green-day.png-ec20b75a43389e61b078bcdd178b82d9.ctex"]
 
 [params]
 

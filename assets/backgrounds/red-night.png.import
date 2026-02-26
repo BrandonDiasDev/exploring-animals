@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cn3bp8tfvsvbc"
-path="res://.godot/imported/red.png-15218ab72fb535ce007995f5facdb3c6.ctex"
+uid="uid://2wq1coer1dr2"
+path="res://.godot/imported/red-night.png-55db658d904cf1deeb9de8bd116d2c33.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/backgrounds/red.png"
-dest_files=["res://.godot/imported/red.png-15218ab72fb535ce007995f5facdb3c6.ctex"]
+source_file="res://assets/backgrounds/red-night.png"
+dest_files=["res://.godot/imported/red-night.png-55db658d904cf1deeb9de8bd116d2c33.ctex"]
 
 [params]
 

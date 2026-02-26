@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b3mur0fllqxen"
-path="res://.godot/imported/Group 133.png-c34d4b8e900d363b0cbf03e778ac1c39.ctex"
+uid="uid://buhr56lrw4bce"
+path="res://.godot/imported/red-day.png-c9dc396b67ac9b31ad8be5dca694ccf5.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/backgrounds/Group 133.png"
-dest_files=["res://.godot/imported/Group 133.png-c34d4b8e900d363b0cbf03e778ac1c39.ctex"]
+source_file="res://assets/backgrounds/red-day.png"
+dest_files=["res://.godot/imported/red-day.png-c9dc396b67ac9b31ad8be5dca694ccf5.ctex"]
 
 [params]
 

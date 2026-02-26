@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bvp0hhlbna5jf"
-path="res://.godot/imported/01.png-50e27982143d2f0111d7d58223e99d28.ctex"
+uid="uid://jq78aysov5g2"
+path="res://.godot/imported/blue-night.png-b2155b1cd16cd4cddf60954a67beba09.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/backgrounds/01.png"
-dest_files=["res://.godot/imported/01.png-50e27982143d2f0111d7d58223e99d28.ctex"]
+source_file="res://assets/backgrounds/blue-night.png"
+dest_files=["res://.godot/imported/blue-night.png-b2155b1cd16cd4cddf60954a67beba09.ctex"]
 
 [params]
 
