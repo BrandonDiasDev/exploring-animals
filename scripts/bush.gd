@@ -100,6 +100,9 @@ func on_click():
 	if is_revealed:
 		return
 	emit_signal("bush_clicked")
+	if not current_hidden_animal:
+		_shake_bush()
+		return
 	reveal_animal()
 
 func reveal_animal():

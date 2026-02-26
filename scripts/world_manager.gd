@@ -214,8 +214,32 @@ func restore_bush_state(bush):
 			var hidden_id = get_animal_unique_id(hidden)
 			var this_segment = get_node_or_null_in_parents(bush)
 			var this_scene_index = this_segment.get_meta("scene_index", -1) if this_segment else -1
-			print("[RESTORE BUSH] ", bush.name, " -> não revelado | animal original:", hidden_id, " | this_scene:", this_scene_index)
-			if animals_state.has(hidden_id):
+			var saved_hidden_id = state.get("hidden_animal_id", "")
+			var saved_is_dragged_in = state.get("is_dragged_in", false)
+			print("[RESTORE BUSH] ", bush.name, " -> não revelado | animal original:", hidden_id,
+				" | this_scene:", this_scene_index, " | saved_hidden_id:", saved_hidden_id)
+
+			# Verificar se o estado salvo indica que um animal DIFERENTE deveria estar aqui.
+			# Isso acontece quando o usuário retirou o nativo e arrastou outro para dentro.
+			if saved_is_dragged_in and saved_hidden_id != "" and saved_hidden_id != hidden_id:
+				print("[RESTORE BUSH] ", bush.name, " -> descartando nativo ", hidden_id,
+					": estado salvo pede ", saved_hidden_id)
+				hidden.queue_free()
+				bush.current_hidden_animal = null
+				bush.is_occupied = false
+				# Tentar re-esconder o animal arrastado que deveria estar aqui
+				var active_key = saved_hidden_id + "_active_node"
+				if animals_state.has(active_key):
+					var the_animal = animals_state[active_key]
+					if is_instance_valid(the_animal):
+						print("[RESTORE BUSH] ", bush.name, " -> re-escondendo ", saved_hidden_id, " no lugar do nativo")
+						_rehide_animal_in_bush(bush, the_animal)
+					else:
+						animals_state.erase(active_key)
+						print("[RESTORE BUSH] ", bush.name, " -> active_node de ", saved_hidden_id, " destruído, apagado para recriação")
+				else:
+					print("[RESTORE BUSH] ", bush.name, " -> sem active_node para ", saved_hidden_id, ", será recriado por check_and_create")
+			elif animals_state.has(hidden_id):
 				var saved_scene_index = animals_state[hidden_id].get("scene_index", -1)
 				if saved_scene_index == this_scene_index:
 					# Estado pertence a este segmento — nativo pode reclamar o slot
