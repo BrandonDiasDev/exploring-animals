@@ -51,16 +51,18 @@ func restore_segment_animals(segment):
 	for animal in animals:
 		world_manager.restore_animal_state(animal)
 	
-	# Then check if we need to create an animal that belongs to this scene
-	if world_manager.has_method("check_and_create_missing_animal"):
-		world_manager.check_and_create_missing_animal(segment)
-	
-	# Restaurar estado das moitas
+	# Restaurar estado das moitas ANTES de check_and_create_missing.
+	# _rehide_animal_in_bush seta _active_node; sem isso, check_and_create_missing
+	# cria um animal solto no lugar de um que deveria continuar na moita.
 	var bushes = []
 	find_bushes_recursive(segment, bushes)
 	for bush in bushes:
 		if world_manager.has_method("restore_bush_state"):
 			world_manager.restore_bush_state(bush)
+	
+	# Só então verificar se precisa criar animais que pertencem a esta cena
+	if world_manager.has_method("check_and_create_missing_animal"):
+		world_manager.check_and_create_missing_animal(segment)
 
 func find_animals_recursive(node, animals_array):
 	if node.is_in_group("animals"):

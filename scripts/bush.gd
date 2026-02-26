@@ -3,6 +3,7 @@ class_name Bush
 
 signal animal_revealed(animal: Animal)
 signal bush_clicked
+signal animal_accepted_by_bush(animal: Animal, bush: Bush)
 
 @export var bush_name := "Arbusto"
 @export var is_revealed := false
@@ -183,6 +184,22 @@ func _accept_animal(animal: Animal):
 	is_revealed = false
 	current_hidden_animal = animal
 	animal.set_meta("managed_by_bush", true)
+
+	# Mover o animal para o Plane deste segmento.
+	# Sem isso, o animal continua filho do segmento de onde veio e é destruído
+	# quando aquele segmento recicla, mesmo estando logicamente nessa moita.
+	var our_plane = get_parent()  # ex: Plane2 do nosso segmento
+	if our_plane and animal.get_parent() != our_plane:
+		var gpos = animal.global_position
+		var old_parent = animal.get_parent()
+		if old_parent:
+			old_parent.remove_child(animal)
+		our_plane.add_child(animal)
+		animal.global_position = gpos
+		print("[BUSH ACCEPT REPARENT] ", animal.name, " -> ", our_plane.name, " de ", (our_plane.get_parent().name if our_plane.get_parent() else "?"))
+
+	# Notificar world_manager para atualizar scene_index do animal
+	emit_signal("animal_accepted_by_bush", animal, self)
 
 	# Guardar a scale alvo antes de animar
 	var original_scale = animal.scale
