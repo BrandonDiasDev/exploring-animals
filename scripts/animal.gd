@@ -224,14 +224,21 @@ func check_plane_change():
 	var camera_bottom = camera_pos.y + (viewport_size.y / (2.0 * camera.zoom.y))
 	var division_y = camera_top + (camera_bottom - camera_top) * 0.6
 	
+	# Usar a base dos pés como referencial: centro do sprite + metade da altura * escala + offset
+	const FEET_OFFSET := 20.0
+	var feet_y := global_position.y
+	if sprite and sprite.texture:
+		feet_y += sprite.texture.get_height() / 2.0 * scale.y + FEET_OFFSET
+	
 	var new_plane = ""
-	if global_position.y < division_y:
+	if feet_y < division_y:
 		new_plane = "plane2"
 	else:
 		new_plane = "plane1"
 	
 	if current_plane != new_plane:
-		print("[PLANE CHANGE] ", current_plane, " -> ", new_plane)
+		print("[PLANE CHANGE] ", current_plane, " -> ", new_plane,
+			" | feet_y:", "%.0f" % feet_y, " | division_y:", "%.0f" % division_y)
 		change_to_plane(new_plane)
 
 func change_to_plane(new_plane: String):
