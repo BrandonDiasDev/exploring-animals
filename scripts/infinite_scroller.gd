@@ -134,7 +134,7 @@ func recycle_segment(index: int, new_x: float) -> void:
 	# Log animals before destroying
 	var animals_before = []
 	find_animals_recursive(old_segment, animals_before)
-	print("[SEGMENT RECYCLE] Destroying scene_index:", old_scene_index, "| animals:", animals_before.size())
+	print("[SEGMENT RECYCLE] Destroying scene_index:", old_scene_index, "| animals_outside_bushes:", animals_before.size())
 	
 	# Save animal states preserving their WORLD positions
 	var world_manager = get_tree().get_first_node_in_group("world_manager")
@@ -145,12 +145,21 @@ func recycle_segment(index: int, new_x: float) -> void:
 		if world_manager and world_manager.has_method("clear_active_animal"):
 			world_manager.clear_active_animal(animal)
 	
-	# Salvar estado das moitas
+	# Salvar estado das moitas (e checar animais que são filhos diretos de bush nodes)
 	var bushes_before = []
 	find_bushes_recursive(old_segment, bushes_before)
 	for bush in bushes_before:
 		if world_manager and world_manager.has_method("save_bush_state"):
 			world_manager.save_bush_state(bush)
+		# Animals originally instantiated inside the bush ARE children of the bush node.
+		# find_animals_recursive skips inside bushes, so we handle them explicitly here.
+		# We only LOG them — their state is managed by save_bush_state + restore path.
+		var hidden = bush.get("current_hidden_animal")
+		if hidden:
+			var in_bush_node = (hidden.get_parent() == bush)
+			print("[SEGMENT RECYCLE] Bush ", bush.name, " hidden_animal:", hidden.name,
+				" | is_child_of_bush:", in_bush_node, " | visible:", hidden.visible,
+				" | managed_by_bush:", hidden.has_meta("managed_by_bush"))
 	
 	old_segment.queue_free()
 	

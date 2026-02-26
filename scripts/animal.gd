@@ -137,7 +137,7 @@ func end_drag():
 	is_being_dragged = false
 	
 	modulate = Color(1, 1, 1, 1)
-	z_index = 0 if current_plane == "plane2" else 10
+	z_index = 100 if current_plane == "plane2" else 200
 	
 	emit_signal("animal_drag_ended", self)
 	
@@ -250,14 +250,17 @@ func change_to_plane(new_plane: String):
 	
 	if new_plane == "plane2":
 		target_scale = Vector2(0.6, 0.6)
-		target_z_index = 0
+		target_z_index = 100
 	else:
 		target_scale = Vector2(1.0, 1.0)
-		target_z_index = 10
+		target_z_index = 200
 	
 	# Scale e z_index mudam instantaneamente — sem tween para não colidir com animações de reveal
 	scale = target_scale
 	z_index = target_z_index
+	
+	# Reparentar para o nó Plane correto (preservando posição global)
+	_reparent_to_plane(new_plane)
 	
 	# Só o flash de modulate como feedback visual da mudança de plano
 	var tween = create_tween()
@@ -266,6 +269,35 @@ func change_to_plane(new_plane: String):
 	
 	await tween.finished
 	play_plane_change_sound()
+
+func _reparent_to_plane(target_plane_name: String):
+	"""Move o animal para o nó Plane correto dentro do segmento, preservando posição global.
+	Hierarquia esperada: animal -> Plane1|Plane2 -> Segment -> InfiniteScroller"""
+	var target_node_name = "Plane1" if target_plane_name == "plane1" else "Plane2"
+	
+	var current_parent = get_parent()
+	if not current_parent:
+		return
+	
+	# Já está no plano correto?
+	if current_parent.name == target_node_name:
+		return
+	
+	# O segmento é o avô do animal (pai do Plane node)
+	var segment = current_parent.get_parent()
+	if not segment:
+		return
+	
+	var target_plane = segment.get_node_or_null(target_node_name)
+	if not target_plane:
+		return
+	
+	# Reparentar preservando posição global
+	var gpos = global_position
+	current_parent.remove_child(self)
+	target_plane.add_child(self)
+	global_position = gpos
+	print("[REPARENT PLANE] ", animal_name, " ", current_parent.name, " -> ", target_node_name)
 
 func play_click_animation():
 	var tween = create_tween()

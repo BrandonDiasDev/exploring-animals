@@ -139,12 +139,36 @@ func save_bush_state(bush):
 func restore_bush_state(bush):
 	var bush_id = get_bush_unique_id(bush)
 	if not bushes_state.has(bush_id):
+		print("[RESTORE BUSH] ", bush.name, " -> sem estado salvo, conectando sinais")
 		connect_bush_signals_for(bush)
 		return
 	var state = bushes_state[bush_id]
 	if state["is_revealed"]:
+		# _ready() pode ter instanciado um novo animal, mas o arbusto já estava revelado.
+		# Liberamos o animal recém-criado para não duplicar.
+		if bush.current_hidden_animal:
+			print("[RESTORE BUSH] ", bush.name, " -> revelado, descartando animal recém-instanciado:", bush.current_hidden_animal.name)
+			bush.current_hidden_animal.queue_free()
+			bush.current_hidden_animal = null
 		bush.is_revealed = true
-		bush._apply_revealed_state()
+		bush.is_occupied = false
+		bush.area.set_deferred("monitoring", true)
+	else:
+		# Bush is NOT revealed — it has a hidden animal inside.
+		# Register that animal in world_manager so check_and_create won't duplicate it.
+		if bush.current_hidden_animal:
+			var hidden = bush.current_hidden_animal
+			var hidden_id = get_animal_unique_id(hidden)
+			print("[RESTORE BUSH] ", bush.name, " -> não revelado | animal escondido:", hidden_id, " | scene_path:", hidden.scene_file_path)
+			# If this animal has a saved state (e.g. it was dragged in before recycle),
+			# mark it as active so check_and_create won't create a duplicate.
+			if animals_state.has(hidden_id):
+				animals_state[hidden_id + "_active_node"] = hidden
+				print("[RESTORE BUSH] ", bush.name, " -> active node set for ", hidden_id, " (was dragged in)")
+			else:
+				print("[RESTORE BUSH] ", bush.name, " -> animal nao tem estado salvo (animal original da cena)")
+		else:
+			print("[RESTORE BUSH] ", bush.name, " -> não revelado mas sem animal")
 	connect_bush_signals_for(bush)
 
 func connect_bush_signals_for(bush):
@@ -324,9 +348,10 @@ func check_and_create_missing_animal(segment: Node2D):
 				# CRITICAL: Before creating new, check if animal is hiding inside a bush
 				# in this segment. If yes, extract it and restore — don't create a duplicate.
 				var animal_name = animal_id.trim_prefix("animal/")
-				var bush_animal = find_animal_inside_bush(segment, animal_name)
+				var scene_path = state.get("scene_path", "")
+				var bush_animal = find_animal_inside_bush(segment, animal_name, scene_path)
 				if bush_animal:
-					print("[CREATE MISSING] Found ", animal_id, " hiding in bush - extracting instead of creating new")
+					print("[CREATE MISSING] Found ", animal_id, " hiding in bush (name:", bush_animal.name, ") - extracting instead of creating new")
 					extract_animal_from_bush(bush_animal, segment, state)
 					continue
 				
@@ -334,17 +359,22 @@ func check_and_create_missing_animal(segment: Node2D):
 				print("[CREATE MISSING] scene_index:", segment_scene_index, " needs animal:", animal_id)
 				create_animal_in_segment(segment, animal_id, state)
 
-func find_animal_inside_bush(segment: Node2D, animal_name: String) -> Animal:
-	"""Search inside all bushes of a segment for an animal with the given name"""
+func find_animal_inside_bush(segment: Node2D, animal_name: String, scene_path: String = "") -> Animal:
+	"""Search inside all bushes of a segment for an animal matching by name OR scene_path"""
 	var bushes = []
 	if infinite_scroller.has_method("find_bushes_recursive"):
 		infinite_scroller.find_bushes_recursive(segment, bushes)
 	for bush in bushes:
-		if bush.has_method("get") and bush.get("current_hidden_animal"):
-			var hidden = bush.current_hidden_animal
-			if hidden and hidden.name == animal_name:
-				print("[FIND IN BUSH] Found ", animal_name, " inside bush:", bush.name)
-				return hidden
+		var hidden = bush.get("current_hidden_animal")
+		if not hidden:
+			continue
+		var name_match = (hidden.name == animal_name)
+		var path_match = (scene_path != "" and hidden.scene_file_path == scene_path)
+		print("[FIND IN BUSH] bush:", bush.name, " | hidden.name:", hidden.name,
+			" | looking_for:", animal_name, " | name_match:", name_match,
+			" | path_match:", path_match)
+		if name_match or path_match:
+			return hidden
 	return null
 
 func extract_animal_from_bush(animal: Animal, segment: Node2D, state: Dictionary):
@@ -456,43 +486,43 @@ func create_animal_in_segment(segment: Node2D, animal_id: String, state: Diction
 
 func save_animal_state_for_recycle(animal):
 	var animal_id = get_animal_unique_id(animal)
-	
+
+	# Skip invisible animals. Animals inside a bush are invisible, but their
+	# pre-bush free state was already saved at drag end. Overwriting it now would
+	# corrupt it with is_hidden=true and the bush position. Preserve the free state.
 	if not animal.visible:
+		print("[SAVE RECYCLE] SKIP invisible:", animal_id, "| in_bush:", animal.has_meta("managed_by_bush"))
 		return
-	
+
 	# Get which scene is being recycled
 	var segment = get_segment_for_animal(animal)
 	if not segment:
+		print("[SAVE RECYCLE] SKIP no segment for:", animal_id)
 		return
-	
+
 	var segment_scene_index = segment.get_meta("scene_index", -1)
-	
-	# Check if animal already has a saved state
+
+	# If animal was moved to a different scene, don't overwrite with old segment data
 	if animals_state.has(animal_id):
 		var saved_scene_index = animals_state[animal_id].get("scene_index", -1)
-		
-		# If animal was moved to a different scene, don't overwrite with old segment data
 		if saved_scene_index != segment_scene_index:
 			print("[SAVE RECYCLE] SKIP - animal belongs to scene:", saved_scene_index, "| this segment:", segment_scene_index)
 			return
-	
-	# Animal belongs to this segment - save its state
-	var local_pos = animal.position
-	
+
 	# Get the animal's scene path
 	var scene_path = animal.scene_file_path
 	if not scene_path:
 		scene_path = "res://scenes/components/capivara.tscn"
-	
+
 	animals_state[animal_id] = {
 		"plane": animal.current_plane,
 		"scene_index": segment_scene_index,
-		"local_position": local_pos,
+		"local_position": animal.position,
 		"scale": animal.scale,
 		"is_hidden": animal.is_hidden,
 		"scene_path": scene_path
 	}
-	print("[SAVE RECYCLE] id:", animal_id, "| scene_index:", segment_scene_index, "| local_pos:", local_pos)
+	print("[SAVE RECYCLE] id:", animal_id, "| scene_index:", segment_scene_index, "| local_pos:", animal.position)
 
 func restore_animal_state(animal):
 	var animal_id = get_animal_unique_id(animal)

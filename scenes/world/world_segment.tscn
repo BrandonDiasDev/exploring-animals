@@ -1,7 +1,8 @@
-[gd_scene load_steps=4 format=3 uid="uid://bxwcxrsd0eubi"]
+[gd_scene load_steps=5 format=3 uid="uid://bxwcxrsd0eubi"]
 
 [ext_resource type="Texture2D" uid="uid://c4gnjduiinvj4" path="res://assets/backgrounds/green-day.png" id="1_1d4r4"]
 [ext_resource type="PackedScene" uid="uid://cqbwu75urmps8" path="res://scenes/components/capivara.tscn" id="2_kgxi7"]
+[ext_resource type="PackedScene" uid="uid://brjgm5r7cqny8" path="res://scenes/components/tamandua.tscn" id="3_0pvhk"]
 [ext_resource type="PackedScene" uid="uid://ck605vpg4glho" path="res://scenes/components/bush.tscn" id="3_bush1"]
 
 [node name="WorldSegment" type="Node2D"]
@@ -14,11 +15,13 @@ texture = ExtResource("1_1d4r4")
 z_as_relative = false
 
 [node name="Bush1" parent="Plane2" instance=ExtResource("3_bush1")]
-position = Vector2(523, -253)
+position = Vector2(747, -154)
+scale = Vector2(0.6, 0.6)
+hidden_animal_scene = ExtResource("3_0pvhk")
 
 [node name="Plane1" type="Node2D" parent="."]
 z_index = 10
 z_as_relative = false
 
 [node name="Capivara" parent="Plane1" instance=ExtResource("2_kgxi7")]
-position = Vector2(-524, 215)
+position = Vector2(-638, 420)

@@ -1,7 +1,8 @@
-[gd_scene load_steps=3 format=3 uid="uid://l7q234c8jywh"]
+[gd_scene load_steps=4 format=3 uid="uid://l7q234c8jywh"]
 
 [ext_resource type="Texture2D" uid="uid://buhr56lrw4bce" path="res://assets/backgrounds/red-day.png" id="1_inm2u"]
 [ext_resource type="PackedScene" uid="uid://b5ramccl7s4at" path="res://scenes/components/ema.tscn" id="2_inm2u"]
+[ext_resource type="PackedScene" uid="uid://ck605vpg4glho" path="res://scenes/components/bush.tscn" id="2_ku3sj"]
 
 [node name="WorldSegment" type="Node2D"]
 
@@ -11,7 +12,13 @@ texture = ExtResource("1_inm2u")
 
 [node name="Plane2" type="Node2D" parent="."]
 
-[node name="Ema" parent="Plane2" instance=ExtResource("2_inm2u")]
-position = Vector2(544, -581)
+[node name="Bush" parent="Plane2" instance=ExtResource("2_ku3sj")]
+position = Vector2(-452, -554)
+scale = Vector2(0.6, 0.6)
+hidden_animal_scene = null
 
 [node name="Plane1" type="Node2D" parent="."]
+
+[node name="Ema" parent="Plane1" instance=ExtResource("2_inm2u")]
+position = Vector2(510, 704)
+current_plane = "plane1"

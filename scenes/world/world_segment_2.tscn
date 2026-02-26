@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3 uid="uid://c43px4eeuf2it"]
+[gd_scene load_steps=3 format=3 uid="uid://c43px4eeuf2it"]
 
 [ext_resource type="Texture2D" uid="uid://bp3pxthheqdky" path="res://assets/backgrounds/blue-day.png" id="1_6si38"]
+[ext_resource type="PackedScene" uid="uid://ck605vpg4glho" path="res://scenes/components/bush.tscn" id="2_8n7yj"]
 
 [node name="WorldSegment" type="Node2D"]
 
@@ -9,4 +10,13 @@ texture = ExtResource("1_6si38")
 
 [node name="Plane2" type="Node2D" parent="."]
 
+[node name="Bush3" parent="Plane2" instance=ExtResource("2_8n7yj")]
+position = Vector2(543, -152.00002)
+scale = Vector2(0.6, 0.6)
+hidden_animal_scene = null
+
 [node name="Plane1" type="Node2D" parent="."]
+
+[node name="Bush2" parent="Plane1" instance=ExtResource("2_8n7yj")]
+position = Vector2(-452, 642)
+hidden_animal_scene = null

@@ -6,10 +6,11 @@ signal bush_clicked
 
 @export var bush_name := "Arbusto"
 @export var is_revealed := false
+## Cena do animal que fica escondido neste arbusto. Deixe vazio para arbusto sem animal.
+@export var hidden_animal_scene: PackedScene
 
 @onready var bush_sprite: Sprite2D = $BushSprite
 @onready var area: Area2D = $Area2D
-@onready var hidden_animal: Animal = $HiddenAnimal
 
 var is_occupied := false
 var current_hidden_animal: Animal = null
@@ -25,9 +26,15 @@ func _ready():
 	# monitorable SEMPRE true: animais precisam detectar sobreposição com a moita
 	area.monitorable = true
 
-	# O animal padrão da cena já conta como ocupante
-	current_hidden_animal = hidden_animal
-	is_occupied = current_hidden_animal != null
+	# Instanciar o animal escondido a partir da cena exportada (se definida)
+	if hidden_animal_scene:
+		var animal := hidden_animal_scene.instantiate() as Animal
+		if animal:
+			add_child(animal)
+			current_hidden_animal = animal
+			is_occupied = true
+		else:
+			push_warning("[BUSH] hidden_animal_scene não gerou um Animal válido: ", hidden_animal_scene.resource_path)
 
 	if is_revealed:
 		_apply_revealed_state()
@@ -117,14 +124,9 @@ func reveal_animal():
 	var animal = current_hidden_animal
 	current_hidden_animal = null
 
-	# Determine a escala correta baseada no Plane onde a moita está (não no histórico do animal)
-	var bush_parent = get_parent()
-	var target_scale: Vector2
-	if bush_parent and bush_parent.name == "Plane2":
-		target_scale = Vector2(0.6, 0.6)
-	else:
-		target_scale = Vector2(1.0, 1.0)
-	print("[BUSH REVEAL] bush:", name, " | parent:", bush_parent.name if bush_parent else "NULL", " | target_scale:", target_scale, " | animal.scale_now:", animal.scale)
+	var target_scale = animal.scale
+	print("[BUSH REVEAL] bush:", name, " | parent:", (get_parent().name if get_parent() else "NULL"),
+		" | target_scale:", target_scale, " | animal.scale_now:", animal.scale)
 
 	animal.is_hidden = false
 	animal.visible = true
@@ -142,6 +144,7 @@ func reveal_animal():
 
 	# Gravar o plane correto NO animal antes de emitir o signal
 	# O world_manager vai herdar esse valor sem precisar detectar pelo parent chain
+	var bush_parent = get_parent()
 	if bush_parent and bush_parent.name == "Plane2":
 		animal.current_plane = "plane2"
 	else:
