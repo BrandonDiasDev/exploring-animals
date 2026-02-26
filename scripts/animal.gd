@@ -36,14 +36,16 @@ func _ready():
 func _sync_visual_to_plane():
 	"""Garantir que propriedades visuais correspondem ao plano atual"""
 	if current_plane == "plane2":
-		z_index = 100  # Ensure plane2 animals are above all segment contents
+		z_index = 100
 		var expected_scale = Vector2(0.6, 0.6)
 		if scale != expected_scale:
+			print("[SYNC PLANE] ", animal_name, " plane2: scale ", scale, " -> ", expected_scale)
 			scale = expected_scale
 	else:  # plane1
-		z_index = 200  # Ensure plane1 animals are above plane2 and all segment contents
+		z_index = 200
 		var expected_scale = Vector2(1.0, 1.0)
 		if scale != expected_scale:
+			print("[SYNC PLANE] ", animal_name, " plane1: scale ", scale, " -> ", expected_scale)
 			scale = expected_scale
 
 func _on_area_input_event(_viewport, event: InputEvent, _shape_idx):
@@ -246,14 +248,14 @@ func change_to_plane(new_plane: String):
 		target_scale = Vector2(1.0, 1.0)
 		target_z_index = 10
 	
+	# Scale e z_index mudam instantaneamente — sem tween para não colidir com animações de reveal
+	scale = target_scale
 	z_index = target_z_index
 	
+	# Só o flash de modulate como feedback visual da mudança de plano
 	var tween = create_tween()
-	tween.set_parallel(true)
-	
-	tween.tween_property(self, "scale", target_scale, 0.3).set_ease(Tween.EASE_OUT)
-	tween.tween_property(self, "modulate", Color(0.5, 0.5, 1.0), 0.15)
-	tween.chain().tween_property(self, "modulate", Color(1, 1, 1), 0.15)
+	tween.tween_property(self, "modulate", Color(0.5, 0.5, 1.0), 0.1)
+	tween.tween_property(self, "modulate", Color(1, 1, 1), 0.1)
 	
 	await tween.finished
 	play_plane_change_sound()

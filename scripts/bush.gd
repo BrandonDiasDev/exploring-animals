@@ -117,7 +117,15 @@ func reveal_animal():
 	var animal = current_hidden_animal
 	current_hidden_animal = null
 
-	var target_scale = animal.scale
+	# Determine a escala correta baseada no Plane onde a moita está (não no histórico do animal)
+	var bush_parent = get_parent()
+	var target_scale: Vector2
+	if bush_parent and bush_parent.name == "Plane2":
+		target_scale = Vector2(0.6, 0.6)
+	else:
+		target_scale = Vector2(1.0, 1.0)
+	print("[BUSH REVEAL] bush:", name, " | parent:", bush_parent.name if bush_parent else "NULL", " | target_scale:", target_scale, " | animal.scale_now:", animal.scale)
+
 	animal.is_hidden = false
 	animal.visible = true
 	animal.scale = Vector2(0.05, 0.05)
@@ -131,6 +139,14 @@ func reveal_animal():
 
 	if animal.has_meta("managed_by_bush"):
 		animal.remove_meta("managed_by_bush")
+
+	# Gravar o plane correto NO animal antes de emitir o signal
+	# O world_manager vai herdar esse valor sem precisar detectar pelo parent chain
+	if bush_parent and bush_parent.name == "Plane2":
+		animal.current_plane = "plane2"
+	else:
+		animal.current_plane = "plane1"
+	print("[BUSH REVEAL SET PLANE] animal:", animal.name, " | current_plane:", animal.current_plane, " | scale:", animal.scale)
 
 	# Reabilitar o monitoring do animal para que overlaps_area funcione ao ser solto
 	if animal.has_node("Area2D"):
@@ -167,8 +183,11 @@ func _accept_animal(animal: Animal):
 
 	# Guardar a scale alvo antes de animar
 	var original_scale = animal.scale
+	print("[BUSH ACCEPT] animal:", animal.name, " | current_plane:", animal.current_plane, " | scale_entering:", original_scale)
 
-	# Desabilitar interação durante animação
+	# Desabilitar TANTO a área do animal QUANTO da moita durante a animação
+	# Evita que o release do mouse dispare on_click() e revele imediatamente
+	area.set_deferred("monitoring", false)
 	if animal.has_node("Area2D"):
 		animal.get_node("Area2D").set_deferred("monitoring", false)
 
@@ -188,6 +207,7 @@ func _accept_animal(animal: Animal):
 	animal.is_hidden = true
 	animal.modulate = Color(1, 1, 1, 1)
 	animal.scale = original_scale  # Restaurar scale para quando sair
+	print("[BUSH ACCEPT DONE] animal:", animal.name, " | scale_stored:", animal.scale)
 
 	# Arbusto faz animação de "engolida"
 	var gulp_tween = create_tween()

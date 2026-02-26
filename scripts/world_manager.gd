@@ -76,31 +76,25 @@ func _on_bush_animal_revealed(animal: Animal):
 		print("[BUSH REVEAL ERROR] No segment found for ", animal_id)
 		return
 	
-	# Critical: Determine which Plane the bush is in to inherit its plane setting
-	var bush = animal.get_parent()
-	var bush_plane = bush.get_parent() if bush else null
-	if not bush_plane:
-		print("[BUSH REVEAL ERROR] Could not determine bush parent plane")
-		return
-	
-	# Extract plane number from parent node name (Plane1 or Plane2 -> plane1 or plane2)
-	var plane_name = bush_plane.name
-	var plane_number = plane_name.substr(5, 1) if plane_name.begins_with("Plane") else "1"
-	var inherited_plane = "plane" + plane_number
-	
-	# CRITICAL: Animal inherits the plane from the bush it was revealed from
-	animal.current_plane = inherited_plane
+	# bush.gd already set animal.current_plane to the correct plane before emitting the signal
+	# Just read it directly — no fragile parent-chain detection needed
+	var inherited_plane = animal.current_plane
+	var plane_number = inherited_plane.substr(5, 1)  # "plane1" -> "1", "plane2" -> "2"
 	var target_plane_name = "Plane" + plane_number
-	var target_plane = bush_plane  # The plane containing the bush
+	var target_plane = segment.get_node_or_null(target_plane_name)
+	if not target_plane:
+		print("[BUSH REVEAL ERROR] Plane '", target_plane_name, "' not found in segment")
+		return
+	print("[BUSH REVEAL] animal:", animal_id, " | inherited_plane:", inherited_plane, " | scale_before_reparent:", animal.scale)
 	
 	# Store current global position before reparenting
 	var global_pos = animal.global_position
 	
-	# Remove from Bush (current parent)
-	bush.remove_child(animal)
-	
-	# Add to target Plane (same plane as the bush)
-	target_plane.add_child(animal)
+	# Remove from current parent (Bush or wherever it is now)
+	var old_parent = animal.get_parent()
+	if old_parent and old_parent != target_plane:
+		old_parent.remove_child(animal)
+		target_plane.add_child(animal)
 	animal.global_position = global_pos  # Preserve world position
 	
 	# Sync visual properties to the new plane
