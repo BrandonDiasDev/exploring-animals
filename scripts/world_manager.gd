@@ -67,22 +67,65 @@ func _on_bush_clicked():
 	is_dragging = false
 
 func _on_bush_animal_revealed(animal: Animal):
-	"""Quando um animal sai de uma moita, conecta seus sinais e registra estado inicial"""
+	"""Quando um animal sai de uma moita, herda o plane da moita, reparentia e registra estado"""
 	reconnect_animal_signals(animal)
-	# Salva estado inicial para que sobreviva à reciclagem do segmento
+	
 	var animal_id = get_animal_unique_id(animal)
+	var segment = get_segment_for_animal(animal)
+	if not segment:
+		print("[BUSH REVEAL ERROR] No segment found for ", animal_id)
+		return
+	
+	# Critical: Determine which Plane the bush is in to inherit its plane setting
+	var bush = animal.get_parent()
+	var bush_plane = bush.get_parent() if bush else null
+	if not bush_plane:
+		print("[BUSH REVEAL ERROR] Could not determine bush parent plane")
+		return
+	
+	# Extract plane number from parent node name (Plane1 or Plane2 -> plane1 or plane2)
+	var plane_name = bush_plane.name
+	var plane_number = plane_name.substr(5, 1) if plane_name.begins_with("Plane") else "1"
+	var inherited_plane = "plane" + plane_number
+	
+	# CRITICAL: Animal inherits the plane from the bush it was revealed from
+	animal.current_plane = inherited_plane
+	var target_plane_name = "Plane" + plane_number
+	var target_plane = bush_plane  # The plane containing the bush
+	
+	# Store current global position before reparenting
+	var global_pos = animal.global_position
+	
+	# Remove from Bush (current parent)
+	bush.remove_child(animal)
+	
+	# Add to target Plane (same plane as the bush)
+	target_plane.add_child(animal)
+	animal.global_position = global_pos  # Preserve world position
+	
+	# Sync visual properties to the new plane
+	animal._sync_visual_to_plane()
+	
+	print("[BUSH REVEAL REPARENT] ", animal_id, " reparented to ", target_plane_name, " (inherited plane:", inherited_plane, ") in scene_index:", segment.get_meta("scene_index", -1))
+	
+	# Only register state if not already tracked
 	if not animals_state.has(animal_id):
-		var segment = get_segment_for_animal(animal)
-		if segment:
-			animals_state[animal_id] = {
-				"plane": animal.current_plane,
-				"scene_index": segment.get_meta("scene_index", -1),
-				"local_position": animal.position,
-				"scale": animal.scale,
-				"is_hidden": false
-			}
-			animals_state[animal_id + "_active_node"] = animal
-			print("[BUSH REVEAL] Registered animal:", animal_id)
+		# Get the animal's scene path
+		var scene_path = animal.scene_file_path
+		if not scene_path:
+			scene_path = "res://scenes/components/capivara.tscn"
+		
+		# Save with the animal's ACTUAL current state (now inherited from bush)
+		animals_state[animal_id] = {
+			"plane": animal.current_plane,
+			"scene_index": segment.get_meta("scene_index", -1),
+			"local_position": animal.position,
+			"scale": animal.scale,
+			"is_hidden": animal.is_hidden,
+			"scene_path": scene_path
+		}
+		animals_state[animal_id + "_active_node"] = animal
+		print("[BUSH REVEAL] Registered animal:", animal_id, "| plane:", animal.current_plane, "| is_hidden:", animal.is_hidden)
 
 # ─── Estado das moitas ──────────────────────────────────────────────────────────
 
@@ -148,19 +191,24 @@ func save_animal_state(animal):
 		print("[SAVE] SKIPPED - hidden duplicate")
 		return
 	
-	# Determine which segment the animal's position falls within
 	var animal_global_pos = animal.global_position
-	var target_segment = find_segment_containing_position(animal_global_pos)
+	
+	# FIRST: Check if animal is actually a child of a segment
+	var current_segment = get_segment_for_animal(animal)
+	var target_segment = current_segment
+	
+	# ONLY use find_segment_containing_position as fallback if not in a segment
+	if not target_segment:
+		target_segment = find_segment_containing_position(animal_global_pos)
 	
 	if not target_segment:
-		print("[SAVE ERROR] No segment contains position:", animal_global_pos)
+		print("[SAVE ERROR] No segment found for position:", animal_global_pos)
 		return
 	
 	var scene_index = target_segment.get_meta("scene_index", -1)
 	var local_pos = animal_global_pos - target_segment.global_position
 	
 	# Check if animal needs to move to a different segment physically
-	var current_segment = get_segment_for_animal(animal)
 	if current_segment and current_segment != target_segment:
 		var current_scene_idx = current_segment.get_meta("scene_index", -1)
 		print("[SAVE] Animal crossing from scene:", current_scene_idx, " to scene:", scene_index, " | global_pos:", animal_global_pos)
@@ -168,12 +216,18 @@ func save_animal_state(animal):
 		# Update local_pos after move
 		local_pos = animal.global_position - target_segment.global_position
 	
+	# Get the animal's scene path
+	var scene_path = animal.scene_file_path
+	if not scene_path:
+		scene_path = "res://scenes/components/capivara.tscn"
+	
 	animals_state[animal_id] = {
 		"plane": animal.current_plane,
 		"scene_index": scene_index,
 		"local_position": local_pos,
 		"scale": animal.scale,
-		"is_hidden": animal.is_hidden
+		"is_hidden": animal.is_hidden,
+		"scene_path": scene_path
 	}
 	print("[SAVE] id:", animal_id, " | scene_index:", scene_index, " | local_pos:", local_pos, " | plane:", animal.current_plane)
 
@@ -229,10 +283,10 @@ func find_segment_containing_position(global_pos: Vector2) -> Node2D:
 	return closest_segment
 
 func check_and_create_missing_animal(segment: Node2D):
-	"""Check if an animal should exist in this segment and create it if missing"""
+	"""Check if any animals should exist in this segment and create if missing"""
 	var segment_scene_index = segment.get_meta("scene_index", -1)
 	
-	# Check all saved animal states to see if any belong to this scene
+	# Check all saved animal states
 	for animal_id in animals_state:
 		if animal_id.ends_with("_active_node"):
 			continue  # Skip the active node markers
@@ -245,28 +299,125 @@ func check_and_create_missing_animal(segment: Node2D):
 		
 		# Does this animal belong to this scene?
 		if saved_scene_index == segment_scene_index:
-			# Check if active instance already exists anywhere
-			var active_key = animal_id + "_active_node"
-			if animals_state.has(active_key):
-				var active_animal = animals_state[active_key]
-				if is_instance_valid(active_animal):
-					print("[CREATE MISSING] SKIP - active instance already exists")
-					return
+			# Check if this animal is ALREADY physically in this segment (outside bushes)
+			var animals_in_segment = []
+			if infinite_scroller.has_method("find_animals_recursive"):
+				infinite_scroller.find_animals_recursive(segment, animals_in_segment)
 			
-			# No active instance - create it
-			print("[CREATE MISSING] scene_index:", segment_scene_index, " needs animal:", animal_id)
-			create_animal_in_segment(segment, animal_id, state)
-			return  # Only one animal per game
+			var already_exists = false
+			for existing_animal in animals_in_segment:
+				if get_animal_unique_id(existing_animal) == animal_id:
+					already_exists = true
+					print("[CHECK MISSING] Animal ", animal_id, " already in segment (outside bush)")
+					var active_key = animal_id + "_active_node"
+					if animals_state.has(active_key):
+						var old_active = animals_state[active_key]
+						if is_instance_valid(old_active) and old_active != existing_animal:
+							old_active.visible = false
+							print("[CHECK MISSING] Hid duplicate instance")
+					animals_state[active_key] = existing_animal
+					break
+			
+			if not already_exists:
+				# Check if active instance exists in a different segment
+				var active_key = animal_id + "_active_node"
+				if animals_state.has(active_key):
+					var active_animal = animals_state[active_key]
+					if is_instance_valid(active_animal):
+						print("[CREATE MISSING] SKIP ", animal_id, " - active instance in another segment")
+						continue
+				
+				# CRITICAL: Before creating new, check if animal is hiding inside a bush
+				# in this segment. If yes, extract it and restore — don't create a duplicate.
+				var animal_name = animal_id.trim_prefix("animal/")
+				var bush_animal = find_animal_inside_bush(segment, animal_name)
+				if bush_animal:
+					print("[CREATE MISSING] Found ", animal_id, " hiding in bush - extracting instead of creating new")
+					extract_animal_from_bush(bush_animal, segment, state)
+					continue
+				
+				# No existing instance anywhere - create it
+				print("[CREATE MISSING] scene_index:", segment_scene_index, " needs animal:", animal_id)
+				create_animal_in_segment(segment, animal_id, state)
+
+func find_animal_inside_bush(segment: Node2D, animal_name: String) -> Animal:
+	"""Search inside all bushes of a segment for an animal with the given name"""
+	var bushes = []
+	if infinite_scroller.has_method("find_bushes_recursive"):
+		infinite_scroller.find_bushes_recursive(segment, bushes)
+	for bush in bushes:
+		if bush.has_method("get") and bush.get("current_hidden_animal"):
+			var hidden = bush.current_hidden_animal
+			if hidden and hidden.name == animal_name:
+				print("[FIND IN BUSH] Found ", animal_name, " inside bush:", bush.name)
+				return hidden
+	return null
+
+func extract_animal_from_bush(animal: Animal, segment: Node2D, state: Dictionary):
+	"""Extract an animal from its bush and restore it to saved state, reusing the existing node"""
+	var animal_id = get_animal_unique_id(animal)
+	var bush = animal.get_parent()
+	
+	# Tell the bush this animal is being taken
+	if bush and bush.has_method("get"):
+		bush.set("is_revealed", true)
+		bush.set("is_occupied", false)
+		bush.set("current_hidden_animal", null)
+	
+	# Remove meta so world_manager can manage it
+	if animal.has_meta("managed_by_bush"):
+		animal.remove_meta("managed_by_bush")
+	
+	# Determine target plane
+	var plane_name = "Plane1" if state["plane"] == "plane1" else "Plane2"
+	var target_plane = segment.get_node_or_null(plane_name)
+	if not target_plane:
+		print("[EXTRACT ERROR] Plane ", plane_name, " not found")
+		return
+	
+	# Reparent from Bush to Plane
+	var global_pos_before = animal.global_position
+	bush.remove_child(animal)
+	target_plane.add_child(animal)
+	
+	# Restore saved state
+	animal.current_plane = state["plane"]
+	animal.position = state["local_position"]
+	animal.scale = state["scale"]
+	animal.is_hidden = state.get("is_hidden", false)
+	animal.visible = not animal.is_hidden
+	if animal.current_plane == "plane2":
+		animal.z_index = 100
+	else:
+		animal.z_index = 200
+	if animal.has_method("_sync_visual_to_plane"):
+		animal._sync_visual_to_plane()
+	
+	# Enable Area2D monitoring so drag works
+	if animal.has_node("Area2D"):
+		animal.get_node("Area2D").set_deferred("monitoring", true)
+	
+	# Register as active and reconnect signals
+	animals_state[animal_id + "_active_node"] = animal
+	reconnect_animal_signals(animal)
+	
+	print("[EXTRACT] Restored ", animal_id, " from bush | plane:", animal.current_plane, " | local_pos:", animal.position, " | global_pos:", animal.global_position)
 
 func create_animal_in_segment(segment: Node2D, animal_id: String, state: Dictionary):
 	"""Instantiate a new animal node and restore its state"""
-	# Load the animal scene
-	var animal_scene = load("res://scenes/components/capivara.tscn")
+	# Get the correct scene path
+	var scene_path = state.get("scene_path", "res://scenes/components/capivara.tscn")
+	var animal_scene = load(scene_path)
+	
 	if not animal_scene:
-		print("[CREATE ERROR] Could not load animal scene")
+		print("[CREATE ERROR] Could not load animal scene:", scene_path)
 		return
 	
 	var animal = animal_scene.instantiate()
+	
+	# Extract animal name from ID ("animal/AnimalName" -> "AnimalName")
+	var animal_name = animal_id.trim_prefix("animal/")
+	animal.name = animal_name  # Preserve the name so ID stays consistent
 	
 	# Get the correct plane parent
 	var plane_name = "Plane1" if state["plane"] == "plane1" else "Plane2"
@@ -287,24 +438,27 @@ func create_animal_in_segment(segment: Node2D, animal_id: String, state: Diction
 	animal.is_hidden = state.get("is_hidden", false)
 	animal.visible = not animal.is_hidden
 	
-	# Set z_index
+	# Set z_index based on plane
 	if animal.current_plane == "plane2":
 		animal.z_index = 100
 	else:
 		animal.z_index = 200
 	
-	# Sync visual
+	print("[CREATE MISSING] Setting plane:", animal.current_plane, " | z_index:", animal.z_index, " | is_hidden:", animal.is_hidden)
+	
+	# Sync visual after setting plane and z_index
 	if animal.has_method("_sync_visual_to_plane"):
 		animal._sync_visual_to_plane()
 	
 	# Mark as active
-	animals_state[animal_id + "_active_node"] = animal
+	var active_key = animal_id + "_active_node"
+	animals_state[active_key] = animal
 	
 	# Connect signals
 	await get_tree().process_frame
 	reconnect_animal_signals(animal)
 	
-	print("[CREATE MISSING] Created animal in scene:", segment.get_meta("scene_index", -1), " | pos:", animal.position, " | global_pos:", animal.global_position)
+	print("[CREATE MISSING] Created ", animal_name, " in scene_index:", segment.get_meta("scene_index", -1), " | local_pos:", animal.position, " | global_pos:", animal.global_position)
 
 func save_animal_state_for_recycle(animal):
 	var animal_id = get_animal_unique_id(animal)
@@ -331,12 +485,18 @@ func save_animal_state_for_recycle(animal):
 	# Animal belongs to this segment - save its state
 	var local_pos = animal.position
 	
+	# Get the animal's scene path
+	var scene_path = animal.scene_file_path
+	if not scene_path:
+		scene_path = "res://scenes/components/capivara.tscn"
+	
 	animals_state[animal_id] = {
 		"plane": animal.current_plane,
 		"scene_index": segment_scene_index,
 		"local_position": local_pos,
 		"scale": animal.scale,
-		"is_hidden": animal.is_hidden
+		"is_hidden": animal.is_hidden,
+		"scene_path": scene_path
 	}
 	print("[SAVE RECYCLE] id:", animal_id, "| scene_index:", segment_scene_index, "| local_pos:", local_pos)
 
@@ -423,13 +583,19 @@ func restore_animal_state(animal):
 			var scene_index = segment.get_meta("scene_index", -1)
 			var this_scene_index = scene_index
 			
+			# Get the animal's scene path for later recreation
+			var scene_path = animal.scene_file_path
+			if not scene_path:
+				scene_path = "res://scenes/components/capivara.tscn"
+			
 			# Save initial state
 			animals_state[animal_id] = {
 				"plane": animal.current_plane,
 				"scene_index": scene_index,
 				"local_position": animal.position,
 				"scale": animal.scale,
-				"is_hidden": animal.is_hidden
+				"is_hidden": animal.is_hidden,
+				"scene_path": scene_path
 			}
 			print("[RESTORE] FIRST TIME - Saved initial state | scene_index:", scene_index, "| local_pos:", animal.position)
 			
