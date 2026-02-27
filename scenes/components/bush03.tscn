@@ -6,7 +6,7 @@
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_bjpcm"]
 size = Vector2(284, 94)
 
-[node name="Bush" type="Node2D" unique_id=70398715]
+[node name="Bush03" type="Node2D" unique_id=70398715]
 script = ExtResource("1_cgthj")
 
 [node name="BushSprite" type="Sprite2D" parent="." unique_id=1448243075]

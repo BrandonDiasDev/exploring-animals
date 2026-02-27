@@ -14,12 +14,12 @@ texture = ExtResource("1_6si38")
 
 [node name="Plane2" type="Node2D" parent="." unique_id=1999616768]
 
-[node name="Bush" parent="Plane2" unique_id=70398715 instance=ExtResource("2_e1dsy")]
+[node name="Bush02" parent="Plane2" unique_id=70398715 instance=ExtResource("2_e1dsy")]
 position = Vector2(-668, -213)
 hidden_animal_scene = ExtResource("3_e1dsy")
 
 [node name="Plane1" type="Node2D" parent="." unique_id=1304941121]
 
-[node name="Bush" parent="Plane1" unique_id=1323756315 instance=ExtResource("4_8wsw7")]
+[node name="Bush03" parent="Plane1" unique_id=1323756315 instance=ExtResource("4_8wsw7")]
 position = Vector2(691, 619)
 hidden_animal_scene = ExtResource("5_5p0bt")

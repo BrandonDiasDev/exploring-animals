@@ -6,7 +6,7 @@
 [sub_resource type="CircleShape2D" id="CircleShape2D_4vdpm"]
 radius = 181.00276
 
-[node name="Bush" type="Node2D" unique_id=70398715]
+[node name="Bush02" type="Node2D" unique_id=70398715]
 script = ExtResource("1_d08ms")
 
 [node name="BushSprite" type="Sprite2D" parent="." unique_id=1448243075]

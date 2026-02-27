@@ -255,6 +255,10 @@ func restore_bush_state(bush):
 			if saved_is_dragged_in and saved_hidden_id != "" and saved_hidden_id != hidden_id:
 				print("[RESTORE BUSH] ", bush.name, " -> descartando nativo ", hidden_id,
 					": estado salvo pede ", saved_hidden_id)
+				# remove_child imediato antes de queue_free para que o nome fique livre
+				# ainda neste frame — evita rename ao recriar animal com mesmo nome.
+				if hidden_animal.get_parent():
+					hidden_animal.get_parent().remove_child(hidden_animal)
 				hidden_animal.queue_free()
 				bush.current_hidden_animal = null
 				bush.is_occupied = false
@@ -282,6 +286,10 @@ func restore_bush_state(bush):
 					# Descartar nativo e tratar bush como revelado para que check_and_create_missing restaure o animal livre.
 					print("[RESTORE BUSH] ", bush.name, " -> descartando nativo ", hidden_id,
 						": estado salvo is_hidden:false (animal está livre)")
+					# remove_child imediato antes de queue_free para que o nome fique livre
+					# ainda neste frame — evita rename ao recriar animal com mesmo nome.
+					if hidden_animal.get_parent():
+						hidden_animal.get_parent().remove_child(hidden_animal)
 					hidden_animal.queue_free()
 					bush.current_hidden_animal = null
 					bush.is_revealed = true
@@ -292,6 +300,10 @@ func restore_bush_state(bush):
 					# Este nativo é uma cópia obsoleta — descartá-lo para não bloquear o animal real.
 					print("[RESTORE BUSH] ", bush.name, " -> descartando nativo obsoleto ", hidden_id,
 						" (saved_scene:", saved_scene_index, " != this:", this_scene_index, ")")
+					# remove_child imediato antes de queue_free para que o nome fique livre
+					# ainda neste frame — evita rename ao recriar animal com mesmo nome.
+					if hidden_animal.get_parent():
+						hidden_animal.get_parent().remove_child(hidden_animal)
 					hidden_animal.queue_free()
 					bush.current_hidden_animal = null
 					bush.is_occupied = false
@@ -480,6 +492,13 @@ func check_and_create_missing_animal(segment: Node2D):
 	"""Check if any animals should exist in this segment and create if missing"""
 	var segment_scene_index = segment.get_meta("scene_index", -1)
 	
+	# Log total de entradas para detectar acumulo de IDs 
+	var total_state_entries = 0
+	for k in animals_state:
+		if not k.ends_with("_active_node") and animals_state[k] is Dictionary:
+			total_state_entries += 1
+	print("[CHECK MISSING START] scene_index:", segment_scene_index, " | total animals_state entries:", total_state_entries)
+	
 	# Check all saved animal states
 	for animal_id in animals_state:
 		if animal_id.ends_with("_active_node"):
@@ -602,6 +621,9 @@ func extract_animal_from_bush(animal: Animal, segment: Node2D, state: Dictionary
 	reconnect_animal_signals(animal)
 	
 	print("[EXTRACT] Restored ", animal_id, " from bush | plane:", animal.current_plane, " | local_pos:", animal.position, " | global_pos:", animal.global_position)
+	# Verificar gravidade após extrair da moita (animal pode estar acima da terra).
+	if animal.has_method("apply_gravity"):
+		animal.apply_gravity()
 
 func create_animal_in_segment(segment: Node2D, animal_id: String, state: Dictionary):
 	"""Instantiate a new animal node and restore its state"""
@@ -650,39 +672,72 @@ func create_animal_in_segment(segment: Node2D, animal_id: String, state: Diction
 			print("[CREATE MISSING HIDDEN] Bush '", target_bush_name, "' não disponível — criando visível")
 
 	# Add to plane (animal visível ou bush não disponível)
+	var name_before_add = animal.name
 	plane.add_child(animal)
-	
+
+	# Godot pode renomear o nó ao adicioná-lo se já existe outro filho com o mesmo nome
+	# (ex: nativo marcado com queue_free mas ainda na árvore). Quando isso ocorre,
+	# o animal_id (baseado no nome original) fica inconsistente com o nome real do nó,
+	# causando entradas orphan em animals_state que se acumulam a cada recycle.
+	# Solução: migrar o entry de animals_state para a nova chave e apagar a antiga.
+	if animal.name != name_before_add:
+		var new_id: String = "animal/" + animal.name
+		print("[CREATE RENAME FIX] ", animal_id, " renomeado para ", new_id,
+			" — migrando animals_state")
+		# Migrar state dict para a nova chave
+		if animals_state.has(animal_id):
+			animals_state[new_id] = animals_state[animal_id]
+			animals_state.erase(animal_id)
+		# Apagar _active_node fantasma da chave antiga, se existir
+		var old_active_key := animal_id + "_active_node"
+		if animals_state.has(old_active_key):
+			animals_state.erase(old_active_key)
+		# Usar o novo ID daqui em diante
+		animal_id = new_id
+
 	# Restore state
 	animal.current_plane = state["plane"]
 	animal.position = state["local_position"]
 	animal.scale = state["scale"]
 	animal.is_hidden = state.get("is_hidden", false)
 	animal.visible = not animal.is_hidden
-	
+
 	# Set z_index based on plane
 	if animal.current_plane == "plane2":
 		animal.z_index = 100
 	else:
 		animal.z_index = 200
-	
+
 	print("[CREATE MISSING] Setting plane:", animal.current_plane, " | z_index:", animal.z_index, " | is_hidden:", animal.is_hidden)
-	
+
 	# Sync visual after setting plane and z_index
 	if animal.has_method("_sync_visual_to_plane"):
 		animal._sync_visual_to_plane()
-	
-	# Mark as active
-	var active_key = animal_id + "_active_node"
+
+	# Mark as active usando o animal_id atual (já corrigido se houve rename)
+	var active_key := animal_id + "_active_node"
 	animals_state[active_key] = animal
 	
 	# Connect signals
 	await get_tree().process_frame
 	reconnect_animal_signals(animal)
+	# Verificar gravidade após criar animal (pode ter sido criado acima da linha de terra).
+	if is_instance_valid(animal) and animal.has_method("apply_gravity") and animal.visible:
+		animal.apply_gravity()
 	
 	print("[CREATE MISSING] Created ", animal_name, " in scene_index:", segment.get_meta("scene_index", -1), " | local_pos:", animal.position, " | global_pos:", animal.global_position)
 
 func save_animal_state_for_recycle(animal):
 	var animal_id = get_animal_unique_id(animal)
+	
+	# DIAGNÓSTICO: IDs com '@' ou que começam com '_' são nomes autogenerated pelo Godot,
+	# indicando que um animal foi renomeado ao ser adicionado à árvore de cena.
+	# Esses IDs se acumulam a cada recycle e causam multiplicação.
+	var raw_name = animal_id.trim_prefix("animal/")
+	if "@" in raw_name or raw_name.begins_with("_"):
+		push_warning("[SAVE RECYCLE WARN] ID autogenerated detectado: ", animal_id,
+			" — possível animal duplicado. Este ID será recriado no próximo ciclo.")
+		print("[SAVE RECYCLE WARN] ID autogenerated: ", animal_id, " | pos:", animal.position)
 
 	# Skip invisible animals. Animals inside a bush are invisible, but their
 	# pre-bush free state was already saved at drag end. Overwriting it now would
@@ -796,6 +851,9 @@ func restore_animal_state(animal):
 		reconnect_animal_signals(animal)
 		
 		print("[RESTORE] id:", animal_id, "| plane:", state["plane"], "| final_global_pos:", animal.global_position, "| ACTIVE")
+		# Verificar gravidade após restaurar a posição (animal pode estar acima da terra).
+		if animal.has_method("apply_gravity"):
+			animal.apply_gravity()
 		return true
 	else:
 		# First time - save initial state based on which segment animal was created in
@@ -832,6 +890,9 @@ func restore_animal_state(animal):
 				animal.z_index = 200
 			animals_state[animal_id + "_active_node"] = animal
 			reconnect_animal_signals(animal)
+			# Verificar gravidade para animal inicial (pode estar acima da terra na cena).
+			if animal.has_method("apply_gravity"):
+				animal.apply_gravity()
 			return true
 		else:
 			print("[RESTORE ERROR] First time but no segment found")
@@ -858,6 +919,16 @@ func clear_active_animal(animal):
 		if active_animal == animal:
 			animals_state.erase(active_key)
 			print("[CLEAR ACTIVE] id:", animal_id)
+		else:
+			# O _active_node aponta para um nó DIFERENTE — provavelmente o animal foi
+			# renomeado pelo Godot ao entrar na árvore, então a chave nunca correspondeu.
+			print("[CLEAR ACTIVE MISMATCH] id:", animal_id,
+				" | active_node é outro nó:", (active_animal.name if is_instance_valid(active_animal) else "DESTRUÍDO"),
+				" | este animal:", animal.name,
+				" \u2014 entrada ÓRFÃ em animals_state não será limpa!")
+	else:
+		print("[CLEAR ACTIVE NO KEY] id:", animal_id, " | active_key não existe em animals_state",
+			" \u2014 este animal nunca teve _active_node registrado com este ID (possível rename).")
 
 func find_replacement_animal(animal_id: String):
 	"""Find a visible animal to become the new active one"""

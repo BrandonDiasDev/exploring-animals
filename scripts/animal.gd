@@ -11,6 +11,8 @@ signal animal_drag_ended(animal: Animal)
 @export var animal_sound: AudioStream
 @export_enum("plane1", "plane2") var current_plane := "plane2"
 @export var is_hidden := false
+## Se verdadeiro, a gravidade NÃO afeta este animal (ex: pássaros voadores).
+@export var can_fly: bool = false
 
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var area: Area2D = $Area2D
@@ -23,6 +25,10 @@ var press_timer := 0.0
 const LONG_PRESS_TIME := 0.5
 var is_pressed := false
 var mouse_captured := false
+
+## Estado de queda (gravidade)
+var is_falling: bool = false
+var fall_tween: Tween = null
 
 func _ready():
 	add_to_group("animals")
@@ -131,6 +137,7 @@ func _process(delta):
 				start_drag()
 
 func on_click():
+	_cancel_fall()  # Queda cancelada pelo clique; ação normal retoma
 	emit_signal("animal_clicked", self)
 	play_click_animation()
 	play_sound()
@@ -143,6 +150,7 @@ func start_drag():
 	if not is_pressed or not mouse_captured:
 		return
 	
+	_cancel_fall()  # Pode estar caindo; drag assume controle
 	print("[DRAG START] Animal:", animal_name, "| pos:", position)
 	is_being_dragged = true
 	drag_offset = global_position - get_global_mouse_position()
@@ -170,9 +178,14 @@ func end_drag():
 	var bush_result = _check_bush_drop()
 	if bush_result == "accepted" or bush_result == "rejected":
 		return  # A moita assume o controle a partir daqui
-	
+
+	# Gravidade assume se o animal solto caiu acima da linha de terra.
+	# apply_gravity() callá check_plane_change e save_animal_state ao pousar.
+	if apply_gravity():
+		return
+
 	check_plane_change()
-	
+
 	# Save state after drag
 	var world_manager = get_tree().get_first_node_in_group("world_manager")
 	if world_manager and world_manager.has_method("save_animal_state"):
@@ -226,12 +239,15 @@ func bounce_away_from(source_pos: Vector2):
 	await move_tween.finished
 	
 	print("[BOUNCE] ", animal_name, " pousou em:", global_position)
-	
+
 	# Ajustar plano e salvar estado na posição final
 	check_plane_change()
 	var world_manager = get_tree().get_first_node_in_group("world_manager")
-	if world_manager and world_manager.has_method("save_animal_state"):
-		world_manager.save_animal_state(self)
+	# Gravidade pode assumir se o bounce deixou o animal acima da linha de terra.
+	# Se não, salvar estado aqui normalmente.
+	if not apply_gravity():
+		if world_manager and world_manager.has_method("save_animal_state"):
+			world_manager.save_animal_state(self)
 	if world_manager and world_manager.has_method("notify_bounce_finished"):
 		world_manager.notify_bounce_finished(self)
 
@@ -322,6 +338,83 @@ func _reparent_to_plane(target_plane_name: String):
 	global_position = gpos
 	print("[REPARENT PLANE] ", animal_name, " ", current_parent.name, " -> ", target_node_name)
 
+# ── Gravidade ─────────────────────────────────────────────────────────────────
+
+func apply_gravity() -> bool:
+	"""Verifica se o animal está acima da background_earth_y e, se sim, inicia a queda.
+	Retorna true se a queda foi iniciada, false se não foi necessária.
+	Seguro chamar enquanto a tela se move: o tween opera em position.y local,
+	que é estável porque os segmentos só se deslocam no eixo X."""
+	if can_fly or is_being_dragged or is_hidden or is_falling:
+		return false
+
+	var cfg := get_node_or_null("/root/WorldConfig") as _WorldConfig
+	if not cfg:
+		return false
+
+	# Calcular posição dos pés (mesmo critério de check_plane_change)
+	const FEET_OFFSET_G := 20.0
+	var feet_y := global_position.y
+	if sprite and sprite.texture:
+		feet_y += sprite.texture.get_height() / 2.0 * scale.y + FEET_OFFSET_G
+
+	if feet_y >= cfg.background_earth_y:
+		return false  # Já está na terra ou abaixo — sem queda necessária
+
+	# Destino: pés pousam em Y aleatório entre background_earth_y e o centro (0)
+	var target_feet_y := randf_range(cfg.background_earth_y, 0.0)
+	var feet_offset_val: float = 0.0
+	if sprite and sprite.texture:
+		feet_offset_val = sprite.texture.get_height() / 2.0 * scale.y + FEET_OFFSET_G
+	var target_global_y := target_feet_y - feet_offset_val
+
+	# Converter global Y → local Y do parent.
+	# O parent (Plane1/Plane2) só se move no eixo X, então parent.global_position.y é estável.
+	var parent_node := get_parent() as Node2D
+	var parent_global_y: float = parent_node.global_position.y if parent_node else 0.0
+	var target_local_y: float = target_global_y - parent_global_y
+
+	# Duração proporcional à distância (~400 px/s), entre 0.3s e 1.2s
+	var fall_distance := absf(target_global_y - global_position.y)
+	var fall_duration := clampf(fall_distance / 400.0, 0.3, 1.2)
+
+	is_falling = true
+	if fall_tween and fall_tween.is_valid():
+		fall_tween.kill()
+	fall_tween = create_tween()
+	fall_tween.set_trans(Tween.TRANS_QUAD)
+	fall_tween.set_ease(Tween.EASE_IN)
+	fall_tween.tween_property(self, "position:y", target_local_y, fall_duration)
+	fall_tween.tween_callback(_on_fall_finished)
+
+	print("[GRAVITY] ", animal_name,
+		" caindo de feet_y:", "%.0f" % feet_y,
+		" -> target_feet_y:", "%.0f" % target_feet_y,
+		" | duracao:", "%.2f" % fall_duration, "s")
+	return true
+
+func _cancel_fall():
+	"""Cancela a queda em andamento. Chamado ao iniciar drag ou ao clicar."""
+	if not is_falling:
+		return
+	if fall_tween and fall_tween.is_valid():
+		fall_tween.kill()
+	fall_tween = null
+	is_falling = false
+	print("[GRAVITY CANCEL] ", animal_name, " em y:", "%.0f" % global_position.y)
+
+func _on_fall_finished():
+	"""Callback do tween de queda. Ajusta plano e salva estado."""
+	is_falling = false
+	fall_tween = null
+	print("[GRAVITY LAND] ", animal_name, " pousou em y:", "%.0f" % global_position.y)
+	check_plane_change()
+	var world_manager := get_tree().get_first_node_in_group("world_manager")
+	if world_manager and world_manager.has_method("save_animal_state"):
+		world_manager.save_animal_state(self)
+
+# ─────────────────────────────────────────────────────────────────────────────
+
 func play_click_animation():
 	var tween = create_tween()
 	tween.tween_property(sprite, "position", Vector2(0, -20), 0.15)
@@ -350,11 +443,13 @@ func reveal():
 	if is_hidden:
 		is_hidden = false
 		visible = true
-		
+
 		scale = Vector2(0.1, 0.1)
 		var tween = create_tween()
 		tween.tween_property(self, "scale", Vector2(1.0, 1.0), 0.4).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_BACK)
-		
+		# Após a animação de reveal, verificar se o animal precisa cair.
+		tween.tween_callback(apply_gravity)
+
 		play_sound()
 
 func _exit_tree():
