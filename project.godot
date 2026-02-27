@@ -34,3 +34,7 @@ window/size/window_width_override=800
 window/size/window_height_override=800
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
+
+[autoload]
+
+WorldConfig="*res://scripts/world_config.gd"

@@ -1,6 +1,8 @@
 extends Node2D
 class_name Animal
 
+const _WorldConfig := preload("res://scripts/world_config.gd")
+
 signal animal_clicked(animal: Animal)
 signal animal_drag_started(animal: Animal)
 signal animal_drag_ended(animal: Animal)
@@ -34,16 +36,19 @@ func _ready():
 	_sync_visual_to_plane()
 
 func _sync_visual_to_plane():
-	"""Garantir que propriedades visuais correspondem ao plano atual"""
+	"""Garantir que propriedades visuais correspondem ao plano atual.
+	Os valores de escala vêm de WorldConfig (scripts/world_config.gd)."""
+	var cfg := get_node_or_null("/root/WorldConfig") as _WorldConfig
 	if current_plane == "plane2":
+
 		z_index = 100
-		var expected_scale = Vector2(0.6, 0.6)
+		var expected_scale: Vector2 = cfg.plane2_scale if cfg else Vector2(0.6, 0.6)
 		if scale != expected_scale:
 			print("[SYNC PLANE] ", animal_name, " plane2: scale ", scale, " -> ", expected_scale)
 			scale = expected_scale
 	else:  # plane1
 		z_index = 200
-		var expected_scale = Vector2(1.0, 1.0)
+		var expected_scale: Vector2 = cfg.plane1_scale if cfg else Vector2(1.0, 1.0)
 		if scale != expected_scale:
 			print("[SYNC PLANE] ", animal_name, " plane1: scale ", scale, " -> ", expected_scale)
 			scale = expected_scale
