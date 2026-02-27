@@ -8,12 +8,23 @@
 
 config_version=5
 
+[animation]
+
+compatibility/default_parent_skeleton_in_mesh_instance_3d=true
+
 [application]
 
 config/name="ExploradorBioma"
 run/main_scene="uid://bdqhlfem7thcq"
-config/features=PackedStringArray("4.5", "Mobile")
+config/features=PackedStringArray("4.6", "Mobile")
 config/icon="res://icon.svg"
+
+[debug]
+
+settings/stdout/verbose_stdout=true
+file_logging/enable_file_logging=true
+settings/gdscript/always_track_call_stacks=true
+settings/gdscript/always_track_local_variables=true
 
 [display]
 

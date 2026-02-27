@@ -242,7 +242,7 @@ func check_plane_change():
 		change_to_plane(new_plane)
 
 func change_to_plane(new_plane: String):
-	var old_plane = current_plane
+	var _old_plane = current_plane
 	current_plane = new_plane
 	
 	var target_scale = Vector2.ZERO

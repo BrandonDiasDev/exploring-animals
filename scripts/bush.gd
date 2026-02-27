@@ -129,7 +129,7 @@ func reveal_animal():
 	current_hidden_animal = null
 
 	var target_scale = animal.scale
-	print("[BUSH REVEAL] bush:", name, " | parent:", (get_parent().name if get_parent() else "NULL"),
+	print("[BUSH REVEAL] bush:", name, " | parent:", (str(get_parent().name) if get_parent() else "NULL"),
 		" | target_scale:", target_scale, " | animal.scale_now:", animal.scale)
 
 	animal.is_hidden = false
@@ -203,7 +203,7 @@ func _accept_animal(animal: Animal):
 			old_parent.remove_child(animal)
 		our_plane.add_child(animal)
 		animal.global_position = gpos
-		print("[BUSH ACCEPT REPARENT] ", animal.name, " -> ", our_plane.name, " de ", (our_plane.get_parent().name if our_plane.get_parent() else "?"))
+		print("[BUSH ACCEPT REPARENT] ", animal.name, " -> ", our_plane.name, " de ", (str(our_plane.get_parent().name) if our_plane.get_parent() else "?"))
 
 	# Notificar world_manager para atualizar scene_index do animal
 	emit_signal("animal_accepted_by_bush", animal, self)

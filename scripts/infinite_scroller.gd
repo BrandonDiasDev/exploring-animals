@@ -156,12 +156,12 @@ func recycle_segment(index: int, new_x: float) -> void:
 		# Animals originally instantiated inside the bush ARE children of the bush node.
 		# find_animals_recursive skips inside bushes, so we handle them explicitly here.
 		# We only LOG them — their state is managed by save_bush_state + restore path.
-		var hidden = bush.get("current_hidden_animal")
-		if hidden:
-			var in_bush_node = (hidden.get_parent() == bush)
-			print("[SEGMENT RECYCLE] Bush ", bush.name, " hidden_animal:", hidden.name,
-				" | is_child_of_bush:", in_bush_node, " | visible:", hidden.visible,
-				" | managed_by_bush:", hidden.has_meta("managed_by_bush"))
+		var hidden_animal = bush.get("current_hidden_animal")
+		if hidden_animal:
+			var in_bush_node = (hidden_animal.get_parent() == bush)
+			print("[SEGMENT RECYCLE] Bush ", bush.name, " hidden_animal:", hidden_animal.name,
+				" | is_child_of_bush:", in_bush_node, " | visible:", hidden_animal.visible,
+				" | managed_by_bush:", hidden_animal.has_meta("managed_by_bush"))
 	
 	old_segment.queue_free()
 	

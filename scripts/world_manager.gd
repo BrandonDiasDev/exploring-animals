@@ -210,8 +210,8 @@ func restore_bush_state(bush):
 		# Bush is NOT revealed — it may have a hidden animal inside.
 		if bush.current_hidden_animal:
 			# Animal original da cena (filho direto do bush node)
-			var hidden = bush.current_hidden_animal
-			var hidden_id = get_animal_unique_id(hidden)
+			var hidden_animal = bush.current_hidden_animal
+			var hidden_id = get_animal_unique_id(hidden_animal)
 			var this_segment = get_node_or_null_in_parents(bush)
 			var this_scene_index = this_segment.get_meta("scene_index", -1) if this_segment else -1
 			var saved_hidden_id = state.get("hidden_animal_id", "")
@@ -224,7 +224,7 @@ func restore_bush_state(bush):
 			if saved_is_dragged_in and saved_hidden_id != "" and saved_hidden_id != hidden_id:
 				print("[RESTORE BUSH] ", bush.name, " -> descartando nativo ", hidden_id,
 					": estado salvo pede ", saved_hidden_id)
-				hidden.queue_free()
+				hidden_animal.queue_free()
 				bush.current_hidden_animal = null
 				bush.is_occupied = false
 				# Tentar re-esconder o animal arrastado que deveria estar aqui
@@ -244,14 +244,14 @@ func restore_bush_state(bush):
 				var saved_is_hidden = animals_state[hidden_id].get("is_hidden", false)
 				if saved_scene_index == this_scene_index and saved_is_hidden:
 					# Estado pertence a este segmento E animal está escondido — nativo pode reclamar o slot
-					animals_state[hidden_id + "_active_node"] = hidden
+					animals_state[hidden_id + "_active_node"] = hidden_animal
 					print("[RESTORE BUSH] ", bush.name, " -> active node set for ", hidden_id, " (scene match, is_hidden:true)")
 				elif saved_scene_index == this_scene_index and not saved_is_hidden:
 					# Animal está LIVRE (is_hidden:false) — o bush foi revelado mas is_revealed não foi salvo corretamente.
 					# Descartar nativo e tratar bush como revelado para que check_and_create_missing restaure o animal livre.
 					print("[RESTORE BUSH] ", bush.name, " -> descartando nativo ", hidden_id,
 						": estado salvo is_hidden:false (animal está livre)")
-					hidden.queue_free()
+					hidden_animal.queue_free()
 					bush.current_hidden_animal = null
 					bush.is_revealed = true
 					bush.is_occupied = false
@@ -261,13 +261,13 @@ func restore_bush_state(bush):
 					# Este nativo é uma cópia obsoleta — descartá-lo para não bloquear o animal real.
 					print("[RESTORE BUSH] ", bush.name, " -> descartando nativo obsoleto ", hidden_id,
 						" (saved_scene:", saved_scene_index, " != this:", this_scene_index, ")")
-					hidden.queue_free()
+					hidden_animal.queue_free()
 					bush.current_hidden_animal = null
 					bush.is_occupied = false
 					bush.area.set_deferred("monitoring", true)
 			else:
 				# Nenhum estado salvo — animal nativo inédito, registrar normalmente
-				animals_state[hidden_id + "_active_node"] = hidden
+				animals_state[hidden_id + "_active_node"] = hidden_animal
 				print("[RESTORE BUSH] ", bush.name, " -> active node set for ", hidden_id, " (sem estado salvo)")
 		else:
 			# Sem animal filho — verificar se havia um animal arrastado que deve ser re-escondido
@@ -394,7 +394,7 @@ func save_animal_state(animal):
 	}
 	print("[SAVE] id:", animal_id, " | scene_index:", scene_index, " | local_pos:", local_pos, " | plane:", animal.current_plane)
 
-func move_animal_to_segment(animal, target_segment: Node2D, target_local_pos: Vector2):
+func move_animal_to_segment(animal, target_segment: Node2D, _target_local_pos: Vector2):
 	"""Physically move animal node to a different segment"""
 	# Convert plane name: "plane1" -> "Plane1", "plane2" -> "Plane2"
 	var plane_number = animal.current_plane.substr(5, 1)  # Get the number
@@ -510,16 +510,16 @@ func find_animal_inside_bush(segment: Node2D, animal_name: String, scene_path: S
 	if infinite_scroller.has_method("find_bushes_recursive"):
 		infinite_scroller.find_bushes_recursive(segment, bushes)
 	for bush in bushes:
-		var hidden = bush.get("current_hidden_animal")
-		if not hidden:
+		var hidden_animal = bush.get("current_hidden_animal")
+		if not hidden_animal:
 			continue
-		var name_match = (hidden.name == animal_name)
-		var path_match = (scene_path != "" and hidden.scene_file_path == scene_path)
-		print("[FIND IN BUSH] bush:", bush.name, " | hidden.name:", hidden.name,
+		var name_match = (hidden_animal.name == animal_name)
+		var path_match = (scene_path != "" and hidden_animal.scene_file_path == scene_path)
+		print("[FIND IN BUSH] bush:", bush.name, " | hidden.name:", hidden_animal.name,
 			" | looking_for:", animal_name, " | name_match:", name_match,
 			" | path_match:", path_match)
 		if name_match or path_match:
-			return hidden
+			return hidden_animal
 	return null
 
 func extract_animal_from_bush(animal: Animal, segment: Node2D, state: Dictionary):
@@ -545,7 +545,7 @@ func extract_animal_from_bush(animal: Animal, segment: Node2D, state: Dictionary
 		return
 	
 	# Reparent from Bush to Plane
-	var global_pos_before = animal.global_position
+	var _global_pos_before = animal.global_position
 	bush.remove_child(animal)
 	target_plane.add_child(animal)
 	
@@ -771,7 +771,7 @@ func restore_animal_state(animal):
 		var segment = get_segment_for_animal(animal)
 		if segment:
 			var scene_index = segment.get_meta("scene_index", -1)
-			var this_scene_index = scene_index
+			var _this_scene_index = scene_index
 			
 			# Get the animal's scene path for later recreation
 			var scene_path = animal.scene_file_path
@@ -857,7 +857,7 @@ func reconnect_animal_signals(animal):
 	if animal.has_signal("animal_clicked"):
 		animal.animal_clicked.connect(_on_animal_clicked)
 
-func _on_animal_clicked(animal):
+func _on_animal_clicked(_animal):
 	is_dragging = false
 	mouse_pressed = false
 	can_start_camera_drag = false
