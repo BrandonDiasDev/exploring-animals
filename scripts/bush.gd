@@ -104,13 +104,8 @@ func _on_area_input_event(_viewport, event: InputEvent, _shape_idx):
 
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
-			# Arbusto VAZIO: não intercepta o evento.
-			# Se o animal reveladoestiver sobre o arbusto, o animal precisa receber o clique.
-			# set_input_as_handled() aqui bloquearia o animal de receber o evento.
-			if not is_occupied:
-				print("[BUSH] vazio, evento passa para o animal (sem interceptação)")
-				return
 			# Avisar o world_manager que uma área capturou este press
+			# (impede câmera de arrastar — vale tanto para arbusto ocupado quanto vazio)
 			var wm = get_tree().get_first_node_in_group("world_manager")
 			if wm and wm.has_method("notify_press_intercepted"):
 				wm.notify_press_intercepted()
@@ -118,7 +113,17 @@ func _on_area_input_event(_viewport, event: InputEvent, _shape_idx):
 			press_timer = 0.0
 			mouse_captured = true
 			set_process_input(true)
-			get_viewport().set_input_as_handled()
+			if is_occupied:
+				# Arbusto com animal: consome o evento para que APENAS o arbusto responda.
+				# O animal está oculto, nada mais precisa do press.
+				print("[BUSH] ocupado -> set_input_as_handled")
+				get_viewport().set_input_as_handled()
+			else:
+				# Arbusto VAZIO: NÃO consome o evento.
+				# O animal revelado pode estar sobreposto — ele também precisa receber o press.
+				# A câmera já foi bloqueada por notify_press_intercepted().
+				# No release, on_click() → _shake_bush() será chamado normalmente.
+				print("[BUSH] vazio -> press registrado SEM set_input_as_handled (animal pode receber também)")
 
 func _input(event):
 	if not mouse_captured:
