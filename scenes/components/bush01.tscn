@@ -1,0 +1,19 @@
+[gd_scene format=3 uid="uid://b2xk5k78by648"]
+
+[ext_resource type="Script" uid="uid://dxowuprhe2wap" path="res://scripts/bush.gd" id="1_apr2b"]
+[ext_resource type="Texture2D" uid="uid://dal6k85u4djcq" path="res://assets/vegetation/arbusto04.png" id="2_xnmpg"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_5roi8"]
+size = Vector2(226, 493)
+
+[node name="Bush" type="Node2D" unique_id=70398715]
+script = ExtResource("1_apr2b")
+
+[node name="BushSprite" type="Sprite2D" parent="." unique_id=1448243075]
+texture = ExtResource("2_xnmpg")
+
+[node name="Area2D" type="Area2D" parent="." unique_id=1108052154]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=1604117853]
+position = Vector2(1, -2.5)
+shape = SubResource("RectangleShape2D_5roi8")

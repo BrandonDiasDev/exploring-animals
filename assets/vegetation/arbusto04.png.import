@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c3uuuoyvjrqiu"
-path="res://.godot/imported/ema.png-cc626deff8c9a6330daae921728062e1.ctex"
+uid="uid://dal6k85u4djcq"
+path="res://.godot/imported/arbusto04.png-0d43f2e5d73ae10ed278df5fff60c0dc.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/animals/ema.png"
-dest_files=["res://.godot/imported/ema.png-cc626deff8c9a6330daae921728062e1.ctex"]
+source_file="res://assets/vegetation/arbusto04.png"
+dest_files=["res://.godot/imported/arbusto04.png-0d43f2e5d73ae10ed278df5fff60c0dc.ctex"]
 
 [params]
 

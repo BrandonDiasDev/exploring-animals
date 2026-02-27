@@ -1,29 +1,29 @@
-[gd_scene load_steps=5 format=3 uid="uid://b5ramccl7s4at"]
+[gd_scene format=3 uid="uid://b5ramccl7s4at"]
 
 [ext_resource type="Script" uid="uid://dymxkx07niar6" path="res://scripts/animal.gd" id="1_janv7"]
-[ext_resource type="Texture2D" uid="uid://b2xkhs8gwhg2g" path="res://assets/animals/ema.png" id="2_dy4fa"]
+[ext_resource type="Texture2D" uid="uid://c3uuuoyvjrqiu" path="res://assets/animals/ema.png" id="2_dy4fa"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_dy4fa"]
-size = Vector2(571, 712)
+size = Vector2(176, 234)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_45l8g"]
-size = Vector2(191, 386)
+size = Vector2(57.5, 120)
 
-[node name="Ema" type="Node2D"]
+[node name="Ema" type="Node2D" unique_id=1334313095]
 script = ExtResource("1_janv7")
 animal_name = "Animal"
 
-[node name="Sprite2D" type="Sprite2D" parent="."]
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=2095348685]
 texture = ExtResource("2_dy4fa")
 
-[node name="Area2D" type="Area2D" parent="."]
+[node name="Area2D" type="Area2D" parent="." unique_id=648012542]
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D"]
-position = Vector2(-11.5, 202)
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=1537723314]
+position = Vector2(-4, 66)
 shape = SubResource("RectangleShape2D_dy4fa")
 
-[node name="CollisionShape2D2" type="CollisionShape2D" parent="Area2D"]
-position = Vector2(190.5, -357)
+[node name="CollisionShape2D2" type="CollisionShape2D" parent="Area2D" unique_id=590309697]
+position = Vector2(62, -117)
 shape = SubResource("RectangleShape2D_45l8g")
 
-[node name="AnimationPlayer" type="AnimationPlayer" parent="."]
+[node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=1801072101]
