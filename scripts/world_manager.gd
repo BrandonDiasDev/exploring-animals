@@ -11,6 +11,9 @@ var mouse_pressed := false  # Press confirmado, aguardando motion para virar dra
 var last_mouse_pos := Vector2.ZERO
 var is_animal_being_dragged := false
 var can_start_camera_drag := true
+# True quando uma Area2D (animal ou arbusto) capturou o press deste frame.
+# Impede que um motion imediatamente após o press inicie o drag da câmera.
+var press_intercepted_by_area := false
 
 var animals_state := {}
 var bushes_state := {}
@@ -138,14 +141,36 @@ func _on_bush_animal_revealed(animal: Animal):
 	if old_parent and old_parent != target_plane:
 		old_parent.remove_child(animal)
 		target_plane.add_child(animal)
+	else:
+		# Sem reparent necessário, mas move o animal para o fim da lista de filhos.
+		# Isso garante que o animal dispara input_event ANTES do arbusto (mesmo Plane2),
+		# independente da ordem em que foram adicionados anteriormente.
+		if old_parent:
+			old_parent.move_child(animal, old_parent.get_child_count() - 1)
+			print("[BUSH REVEAL REPARENT] move_child: ", animal_id, " -> fim de ", old_parent.name)
 	animal.global_position = global_pos  # Preserve world position
 	
 	# Sync visual properties to the new plane
 	animal._sync_visual_to_plane()
 	
-	print("[BUSH REVEAL REPARENT] ", animal_id, " reparented to ", target_plane_name, " (inherited plane:", inherited_plane, ") in scene_index:", segment.get_meta("scene_index", -1))
-	
-	# Only register state if not already tracked
+	var wm_area = animal.get_node_or_null("Area2D")
+	var wm_parent = animal.get_parent()
+	print("[BUSH REVEAL REPARENT] ", animal_id, " reparented to ", target_plane_name,
+		" (inherited plane:", inherited_plane,
+		") in scene_index:", segment.get_meta("scene_index", -1),
+		" | animal.z_index:", animal.z_index,
+		" | parent.z_index:", (wm_parent.z_index if wm_parent else "N/A"),
+		" | parent.z_as_relative:", (wm_parent.z_as_relative if wm_parent else "N/A"),
+		" | area.monitoring:", (wm_area.monitoring if wm_area else "NO_AREA"),
+		" | area.input_pickable:", (wm_area.input_pickable if wm_area else "NO_AREA"),
+		" | animal.visible:", animal.visible,
+		" | animal.is_hidden:", animal.is_hidden)
+
+	# Verificar estado 1 frame depois (após set_deferred do monitoring aplicar)
+	call_deferred("_log_reveal_next_frame", animal, animal_id)
+
+	# Registrar / atualizar estado. Se já existia (ex: animal da cena que passou por
+	# restore_animal_state antes do reveal), só atualiza is_hidden e garante active_node.
 	if not animals_state.has(animal_id):
 		# Get the animal's scene path
 		var scene_path = animal.scene_file_path
@@ -158,11 +183,17 @@ func _on_bush_animal_revealed(animal: Animal):
 			"scene_index": segment.get_meta("scene_index", -1),
 			"local_position": animal.position,
 			"scale": animal.scale,
-			"is_hidden": animal.is_hidden,
+			"is_hidden": false,
 			"scene_path": scene_path
 		}
 		animals_state[animal_id + "_active_node"] = animal
-		print("[BUSH REVEAL] Registered animal:", animal_id, "| plane:", animal.current_plane, "| is_hidden:", animal.is_hidden)
+		print("[BUSH REVEAL] Registered animal:", animal_id, "| plane:", animal.current_plane, "| is_hidden:false")
+	else:
+		# Estado já existe (animal da cena que foi encontrado por restore_animal_state).
+		# Apenas atualiza is_hidden e garante que o active_node aponta para este nó.
+		animals_state[animal_id]["is_hidden"] = false
+		animals_state[animal_id + "_active_node"] = animal
+		print("[BUSH REVEAL] Updated existing state for:", animal_id, "| is_hidden -> false | active_node set")
 
 # ─── Estado das moitas ──────────────────────────────────────────────────────────
 
@@ -838,10 +869,34 @@ func find_replacement_animal(animal_id: String):
 			print("[REPLACEMENT] id:", animal_id, "| new active animal found")
 			return
 
+func _log_reveal_next_frame(animal, animal_id: String):
+	"""Log estado do animal 1 frame depois do reveal (após set_deferred aplicar)."""
+	if not is_instance_valid(animal):
+		print("[REVEAL +1 FRAME] ", animal_id, " -> nó destruído")
+		return
+	var area = animal.get_node_or_null("Area2D")
+	var parent = animal.get_parent()
+	var parent_z_rel: String = str(parent.z_as_relative) if parent else "N/A"
+	var parent_z: String = str(parent.z_index) if parent else "N/A"
+	# Calcula z efetivo simplificado para Area2D do animal
+	var effective_z: int = animal.z_index
+	if parent and parent.z_as_relative:
+		effective_z = parent.z_index + animal.z_index
+	print("[REVEAL +1 FRAME] ", animal_id,
+		" | z_index:", animal.z_index,
+		" | effective_z_approx:", effective_z,
+		" | parent:", (parent.name if parent else "NULL"),
+		" | parent.z_index:", parent_z,
+		" | parent.z_as_relative:", parent_z_rel,
+		" | area.monitoring:", (str(area.monitoring) if area else "NO_AREA"),
+		" | area.input_pickable:", (str(area.input_pickable) if area else "NO_AREA"),
+		" | visible:", animal.visible,
+		" | is_hidden:", animal.is_hidden,
+		" | position:", animal.position,
+		" | global_pos:", animal.global_position)
+
 func reconnect_animal_signals(animal):
 	"""Reconectar sinais de um animal (usado após reciclagem de segmento)"""
-	
-	# Desconectar se já estava conectado (evitar duplicatas)
 	if animal.animal_drag_started.is_connected(_on_animal_drag_started):
 		animal.animal_drag_started.disconnect(_on_animal_drag_started)
 	if animal.animal_drag_ended.is_connected(_on_animal_drag_ended):
@@ -888,15 +943,24 @@ func notify_bounce_finished(animal):
 	print("[CAM] bounce_finished:", animal.animal_name, " -> is_animal_being_dragged = false")
 	is_animal_being_dragged = false
 
+func notify_press_intercepted():
+	"""Chamado por Area2D de animal/arbusto quando captura um press.
+	Impede que o próximo Motion event inicie o drag da câmera."""
+	press_intercepted_by_area = true
+	print("[WM] press_intercepted_by_area = true")
+
 func _input(event):
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if not event.pressed:
+			if mouse_pressed or is_dragging:
+				print("[WM _input] LEFT RELEASE | mouse_pressed:", mouse_pressed, " is_dragging:", is_dragging, " -> reset")
 			mouse_pressed = false
 			is_dragging = false
 
 func _unhandled_input(event):
 	if is_animal_being_dragged:
 		if mouse_pressed or is_dragging:
+			print("[WM _unhandled] animal dragging -> reset cam state")
 			mouse_pressed = false
 			is_dragging = false
 		return
@@ -904,19 +968,30 @@ func _unhandled_input(event):
 	if event is InputEventMouseButton:
 		if event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
+				# Resetar flag de interceptação a cada novo press
+				press_intercepted_by_area = false
+				print("[WM _unhandled] LEFT PRESS -> mouse_pressed=true | press_intercepted reset")
 				mouse_pressed = true
 				last_mouse_pos = event.position
 			else:
+				print("[WM _unhandled] LEFT RELEASE | was_dragging:", is_dragging, " -> reset")
 				mouse_pressed = false
 				is_dragging = false
+				press_intercepted_by_area = false
 	
 	elif event is InputEventMouseMotion and mouse_pressed:
 		if is_animal_being_dragged:
+			print("[WM _unhandled] MOTION but animal dragging -> cancel cam")
 			mouse_pressed = false
 			is_dragging = false
 			return
 		
+		if press_intercepted_by_area:
+			print("[WM _unhandled] MOTION blocked: area intercepted the press")
+			return
+		
 		if not is_dragging:
+			print("[WM _unhandled] MOTION -> cam drag START")
 			is_dragging = true
 		
 		var delta_x = event.position.x - last_mouse_pos.x

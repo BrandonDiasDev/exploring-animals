@@ -66,7 +66,11 @@ func restore_segment_animals(segment):
 
 func find_animals_recursive(node, animals_array):
 	if node.is_in_group("animals"):
-		animals_array.append(node)
+		# Ignorar animais gerenciados por arbusto: estão visivelmente ocultos
+		# e podem agora estar em Plane2 (não dentro do nó Bush) — não devem
+		# ser processados pelo save/restore de segmentos.
+		if not node.has_meta("managed_by_bush"):
+			animals_array.append(node)
 	# Não entrar dentro de uma moita — o animal escondido é gerenciado pela moita
 	if node.is_in_group("bushes"):
 		return

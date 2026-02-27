@@ -31,16 +31,41 @@ func _ready():
 	if hidden_animal_scene:
 		var animal := hidden_animal_scene.instantiate() as Animal
 		if animal:
-			add_child(animal)
+			# Aplicar estado oculto imediatamente (não precisa estar na árvore)
+			animal.visible = false
+			animal.is_hidden = true
+			animal.set_meta("managed_by_bush", true)
 			current_hidden_animal = animal
 			is_occupied = true
+			# Adicionar ao PAI do arbusto via deferred: _ready() roda enquanto o
+			# segmento ainda está instanciando filhos; add_child síncrono falha.
+			# Adicionamos ao Plane2/Plane1 (pai do arbusto) para evitar reparent no reveal.
+			call_deferred("_attach_hidden_animal", animal)
 		else:
 			push_warning("[BUSH] hidden_animal_scene não gerou um Animal válido: ", hidden_animal_scene.resource_path)
 
 	if is_revealed:
 		_apply_revealed_state()
+	# _apply_hidden_state é chamado dentro de _attach_hidden_animal após add_child
+
+# ─── Anexar animal ao pai (deferred) ──────────────────────────────────────────
+
+func _attach_hidden_animal(animal: Animal):
+	"""Adiciona o animal ao pai do arbusto (ex: Plane2) após a árvore estar pronta."""
+	if not is_instance_valid(animal):
+		return
+	var bush_parent = get_parent()
+	if bush_parent:
+		bush_parent.add_child(animal)
+		animal.position = self.position  # mesma posição do arbusto no Plane
+		print("[BUSH ATTACH] ", name, " -> '", animal.name, "' adicionado a '", bush_parent.name,
+			"' pos:", animal.position)
 	else:
-		_apply_hidden_state()
+		add_child(animal)  # fallback: arbusto sem pai
+		print("[BUSH ATTACH] ", name, " -> fallback, animal adicionado ao próprio arbusto")
+	# Desabilitar monitoring agora que o nó está na árvore
+	if animal.has_node("Area2D"):
+		animal.get_node("Area2D").set_deferred("monitoring", false)
 
 # ─── Estado inicial ────────────────────────────────────────────────────────────
 
@@ -61,12 +86,34 @@ func _apply_revealed_state():
 # ─── Input ─────────────────────────────────────────────────────────────────────
 
 func _on_area_input_event(_viewport, event: InputEvent, _shape_idx):
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		var animal_z: String = str(current_hidden_animal.z_index) if current_hidden_animal else "(sem animal)"
+		var animal_mon = ""
+		if current_hidden_animal and current_hidden_animal.has_node("Area2D"):
+			var a = current_hidden_animal.get_node("Area2D")
+			animal_mon = " | anim.monitoring:" + str(a.monitoring) + " | anim.pickable:" + str(a.input_pickable)
+		print("[BUSH AREA INPUT] ", name,
+			" | is_revealed:", is_revealed,
+			" | is_occupied:", is_occupied,
+			" | bush.z_index:", z_index,
+			" | animal_z:", animal_z, animal_mon)
+
 	# Moita já revelada: ignora cliques no arbusto (animal responde sozinho)
 	if is_revealed:
 		return
 
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
+			# Arbusto VAZIO: não intercepta o evento.
+			# Se o animal reveladoestiver sobre o arbusto, o animal precisa receber o clique.
+			# set_input_as_handled() aqui bloquearia o animal de receber o evento.
+			if not is_occupied:
+				print("[BUSH] vazio, evento passa para o animal (sem interceptação)")
+				return
+			# Avisar o world_manager que uma área capturou este press
+			var wm = get_tree().get_first_node_in_group("world_manager")
+			if wm and wm.has_method("notify_press_intercepted"):
+				wm.notify_press_intercepted()
 			is_pressed = true
 			press_timer = 0.0
 			mouse_captured = true
@@ -128,9 +175,16 @@ func reveal_animal():
 	var animal = current_hidden_animal
 	current_hidden_animal = null
 
-	var target_scale = animal.scale
-	print("[BUSH REVEAL] bush:", name, " | parent:", (str(get_parent().name) if get_parent() else "NULL"),
-		" | target_scale:", target_scale, " | animal.scale_now:", animal.scale)
+	# Usar o plano DO ARBUSTO para determinar scale correta — não a scale armazenada,
+	# que pode vir de outro plano (ex: animal entrou do Plane1 mas o arbusto é Plane2)
+	var bush_parent_name: String = str(get_parent().name) if get_parent() else ""
+	var target_scale: Vector2
+	if bush_parent_name == "Plane2":
+		target_scale = Vector2(0.6, 0.6)
+	else:
+		target_scale = Vector2(1.0, 1.0)
+	print("[BUSH REVEAL] bush:", name, " | parent:", bush_parent_name,
+		" | target_scale (from plane):", target_scale, " | animal.scale_stored:", animal.scale)
 
 	animal.is_hidden = false
 	animal.visible = true
@@ -155,9 +209,24 @@ func reveal_animal():
 		animal.current_plane = "plane1"
 	print("[BUSH REVEAL SET PLANE] animal:", animal.name, " | current_plane:", animal.current_plane, " | scale:", animal.scale)
 
-	# Reabilitar o monitoring do animal para que overlaps_area funcione ao ser solto
+	# Reabilitar o monitoring do animal via set_deferred:
+	# A reparentagem ocorre síncrona no signal handler deste mesmo frame.
+	# Alterar monitoring DIRETAMENTE antes do reparent corrompe o estado
+	# do sistema de física (Area2D desce e sobe da árvore com monitoring=true
+	# no meio da operação). set_deferred aplica DEPOIS que o reparent terminou.
 	if animal.has_node("Area2D"):
 		animal.get_node("Area2D").set_deferred("monitoring", true)
+
+	var dbg_area = animal.get_node_or_null("Area2D")
+	print("[REVEAL PRE-SIGNAL] ", animal.name,
+		" | z_index:", animal.z_index,
+		" | visible:", animal.visible,
+		" | is_hidden:", animal.is_hidden,
+		" | current_plane:", animal.current_plane,
+		" | parent:", (str(animal.get_parent().name) if animal.get_parent() else "NULL"),
+		" | area.monitoring (deferred pending, atual):", (str(dbg_area.monitoring) if dbg_area else "NO_AREA"),
+		" | area.input_pickable:", (str(dbg_area.input_pickable) if dbg_area else "NO_AREA"),
+		" | bush.z_index:", z_index)
 
 	emit_signal("animal_revealed", animal)
 
@@ -167,7 +236,7 @@ func reveal_animal():
 
 	# Reabilitar área: arbusto vazio precisa detectar um novo animal solto sobre ele
 	area.set_deferred("monitoring", true)
-	print("[BUSH] reveal completo, area.monitoring = true novamente")
+	print("[BUSH] reveal completo, area.monitoring = true novamente | bush.z_index:", z_index)
 
 # ─── Esconder animal arrastado ────────────────────────────────────────────────
 

@@ -1,22 +1,24 @@
-[gd_scene load_steps=3 format=3 uid="uid://c43px4eeuf2it"]
+[gd_scene format=3 uid="uid://c43px4eeuf2it"]
 
 [ext_resource type="Texture2D" uid="uid://bp3pxthheqdky" path="res://assets/backgrounds/blue-day.png" id="1_6si38"]
 [ext_resource type="PackedScene" uid="uid://ck605vpg4glho" path="res://scenes/components/bush.tscn" id="2_8n7yj"]
+[ext_resource type="PackedScene" uid="uid://b26y5t483lssx" path="res://scenes/components/onca.tscn" id="3_e1dsy"]
+[ext_resource type="PackedScene" uid="uid://b5ramccl7s4at" path="res://scenes/components/ema.tscn" id="4_ccvav"]
 
-[node name="WorldSegment" type="Node2D"]
+[node name="WorldSegment" type="Node2D" unique_id=1767376223]
 
-[node name="Background" type="Sprite2D" parent="."]
+[node name="Background" type="Sprite2D" parent="." unique_id=959871696]
 texture = ExtResource("1_6si38")
 
-[node name="Plane2" type="Node2D" parent="."]
+[node name="Plane2" type="Node2D" parent="." unique_id=1999616768]
 
-[node name="Bush3" parent="Plane2" instance=ExtResource("2_8n7yj")]
+[node name="Bush3" parent="Plane2" unique_id=731795927 instance=ExtResource("2_8n7yj")]
 position = Vector2(543, -152.00002)
 scale = Vector2(0.6, 0.6)
-hidden_animal_scene = null
+hidden_animal_scene = ExtResource("3_e1dsy")
 
-[node name="Plane1" type="Node2D" parent="."]
+[node name="Plane1" type="Node2D" parent="." unique_id=1304941121]
 
-[node name="Bush2" parent="Plane1" instance=ExtResource("2_8n7yj")]
+[node name="Bush2" parent="Plane1" unique_id=1095968642 instance=ExtResource("2_8n7yj")]
 position = Vector2(-452, 642)
-hidden_animal_scene = null
+hidden_animal_scene = ExtResource("4_ccvav")

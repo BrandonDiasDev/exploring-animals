@@ -49,11 +49,29 @@ func _sync_visual_to_plane():
 			scale = expected_scale
 
 func _on_area_input_event(_viewport, event: InputEvent, _shape_idx):
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		var area2d = get_node_or_null("Area2D")
+		var mon: String = str(area2d.monitoring) if area2d else "NO_AREA"
+		var pickable: String = str(area2d.input_pickable) if area2d else "NO_AREA"
+		var parent_name: String = str(get_parent().name) if get_parent() else "NULL"
+		print("[ANIMAL AREA INPUT] ", animal_name,
+			" | is_hidden:", is_hidden,
+			" | visible:", visible,
+			" | z_index:", z_index,
+			" | monitoring:", mon,
+			" | input_pickable:", pickable,
+			" | parent:", parent_name)
+
 	if is_hidden:
 		return
-	
+
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
+			# Avisar o world_manager que uma área capturou este press,
+			# impedindo que o próximo Motion inicie o drag da câmera.
+			var wm = get_tree().get_first_node_in_group("world_manager")
+			if wm and wm.has_method("notify_press_intercepted"):
+				wm.notify_press_intercepted()
 			is_pressed = true
 			press_timer = 0.0
 			mouse_captured = true
