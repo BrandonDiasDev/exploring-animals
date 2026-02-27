@@ -141,6 +141,12 @@ func recycle_segment(index: int, new_x: float) -> void:
 	var animals_before = []
 	find_animals_recursive(old_segment, animals_before)
 	print("[SEGMENT RECYCLE] Destroying scene_index:", old_scene_index, "| animals_outside_bushes:", animals_before.size())
+	for animal in animals_before:
+		print("[SEGMENT RECYCLE ANIMAL] ", animal.name,
+			" | is_falling:", animal.get("is_falling"),
+			" | is_being_dragged:", animal.get("is_being_dragged"),
+			" | visible:", animal.visible,
+			" | global_pos:", animal.global_position)
 	
 	# Save animal states preserving their WORLD positions
 	var world_manager = get_tree().get_first_node_in_group("world_manager")
@@ -176,12 +182,26 @@ func recycle_segment(index: int, new_x: float) -> void:
 	new_segment.position.x = new_x
 	new_segment.set_meta("scene_index", scene_index)
 	add_child(new_segment)
-	
+
+	# Posição correta sincrôna: elimina flicker de 2 frames.
+	# Se há estado salvo para o animal neste segmento, reposiciona antes do primeiro frame renderizar.
+	# Caso contrário (primeira vez), oculta até restore_segment_animals rodar.
+	var native_to_hide = []
+	find_animals_recursive(new_segment, native_to_hide)
+	for _a in native_to_hide:
+		var pre_done: bool = (
+			world_manager != null
+			and world_manager.has_method("pre_restore_animal_position")
+			and world_manager.pre_restore_animal_position(_a)
+		)
+		if not pre_done:
+			_a.visible = false  # sem estado salvo ainda — ocultar até restore_segment_animals
+
 	segments[index].node = new_segment
 	segments[index].scene_index = scene_index
-	
+
 	print("[SEGMENT RECYCLE] Created scene_index:", scene_index, "| pos_x:", new_x)
-	
+
 	# Restaurar estado dos animais
 	call_deferred("restore_segment_animals", new_segment)
 	

@@ -19,6 +19,9 @@ var animals_state := {}
 var bushes_state := {}
 var world_width: float = 0.0
 
+# Validador de invariantes — instanciado sob demanda, apenas em debug builds
+var _validator = null
+
 func _ready():
 	add_to_group("world_manager")
 	
@@ -84,6 +87,19 @@ func _on_bush_accepted_animal(animal: Animal, bush: Bush):
 	# Depois da animação, o animal termina na posição da moita — usamos bush.position como aproximação.
 	var local_pos_approx = bush.position
 
+	# ANTI-BUG DUPLICAÇÃO: limpar qualquer outro animal que reivindicava esta moita com is_hidden=true.
+	# Situação: race condition entre segment restore (is_occupied=false transitório) + drag drop
+	# simultâneo → dois animais com bush_id=X e is_hidden=true → duplicação no próximo recycle.
+	# Ao aceitar um novo animal, o slot pertence SOMENTE a ele — os anteriores ficam livres.
+	for _stale_id in animals_state.keys():
+		if _stale_id.ends_with("_active_node") or _stale_id == animal_id:
+			continue
+		var _stale_state = animals_state[_stale_id]
+		if _stale_state is Dictionary and _stale_state.get("bush_id", "") == bush_id and _stale_state.get("is_hidden", false):
+			print("[BUSH ACCEPT WM] STALE CLAIM LIMPO: ", _stale_id, " também reivindicava ", bush_id, " com is_hidden=true → is_hidden=false, bush_id removido")
+			_stale_state["is_hidden"] = false
+			_stale_state.erase("bush_id")
+
 	if animals_state.has(animal_id):
 		var old_index = animals_state[animal_id].get("scene_index", -1)
 		animals_state[animal_id]["scene_index"] = new_scene_index
@@ -107,6 +123,18 @@ func _on_bush_accepted_animal(animal: Animal, bush: Bush):
 			"scene_path": scene_path
 		}
 		print("[BUSH ACCEPT WM] ", animal_id, " novo estado | scene_index:", new_scene_index, " | bush_id:", bush_id)
+
+	# O drag terminou definitivamente — a moita aceitou o animal.
+	# Limpar a flag imediatamente em vez de esperar o timer genérico de 0.5s
+	# (que cobre bounce, mas bounce não acontece quando a moita aceita).
+	if is_animal_being_dragged:
+		print("[BUSH ACCEPT WM] drag concluído por aceitação de moita → is_animal_being_dragged = false")
+		is_animal_being_dragged = false
+
+	# Aguardar animação de esconder (~0.22s) + margem antes de validar.
+	# _on_bush_accepted_animal dispara antes do await move_tween em _accept_animal,
+	# então o nó ainda tem is_hidden=false enquanto anima. Timer cobre isso.
+	get_tree().create_timer(0.60).timeout.connect(func(): validate_state("after_bush_accept"), CONNECT_ONE_SHOT)
 
 func _on_bush_clicked():
 	mouse_pressed = false
@@ -195,6 +223,8 @@ func _on_bush_animal_revealed(animal: Animal):
 		animals_state[animal_id + "_active_node"] = animal
 		print("[BUSH REVEAL] Updated existing state for:", animal_id, "| is_hidden -> false | active_node set")
 
+	validate_state("after_bush_reveal")
+
 # ─── Estado das moitas ──────────────────────────────────────────────────────────
 
 func get_bush_unique_id(bush) -> String:
@@ -232,6 +262,12 @@ func restore_bush_state(bush):
 		# Liberamos o animal recém-criado para não duplicar.
 		if bush.current_hidden_animal:
 			print("[RESTORE BUSH] ", bush.name, " -> revelado, descartando animal recém-instanciado:", bush.current_hidden_animal.name)
+			# remove_child ANTES de queue_free para liberar o nome do nó imediatamente.
+			# Sem isso, o nó fica na árvore até fim do frame: se check_and_create_missing_animal
+			# adicionar outro filho com o mesmo nome no mesmo frame, Godot renomeia para @Node2D@N,
+			# corrompendo o animals_state com IDs inválidos a cada ciclo.
+			if bush.current_hidden_animal.get_parent():
+				bush.current_hidden_animal.get_parent().remove_child(bush.current_hidden_animal)
 			bush.current_hidden_animal.queue_free()
 			bush.current_hidden_animal = null
 		bush.is_revealed = true
@@ -261,7 +297,13 @@ func restore_bush_state(bush):
 					hidden_animal.get_parent().remove_child(hidden_animal)
 				hidden_animal.queue_free()
 				bush.current_hidden_animal = null
-				bush.is_occupied = false
+				# ANTI-BUG DUPLICAÇÃO: NÃO definir is_occupied=false aqui.
+				# check_and_create_missing_animal possui awaits internos (process_frame);
+				# se is_occupied=false nesse período, um animal arrastado concorrente
+				# pode entrar na moita → dois animais reivindicam o mesmo bush_id → duplicação.
+				# Mantemos is_occupied=true para bloquear try_accept_animal até que o
+				# animal correto seja colocado por create_animal_in_segment.
+				bush.is_occupied = true
 				# Tentar re-esconder o animal arrastado que deveria estar aqui
 				var active_key = saved_hidden_id + "_active_node"
 				if animals_state.has(active_key):
@@ -271,16 +313,31 @@ func restore_bush_state(bush):
 						_rehide_animal_in_bush(bush, the_animal)
 					else:
 						animals_state.erase(active_key)
-						print("[RESTORE BUSH] ", bush.name, " -> active_node de ", saved_hidden_id, " destruído, apagado para recriação")
+						print("[RESTORE BUSH] ", bush.name, " -> active_node de ", saved_hidden_id, " destruído → moita reservada (is_occupied=true) para recriação")
 				else:
-					print("[RESTORE BUSH] ", bush.name, " -> sem active_node para ", saved_hidden_id, ", será recriado por check_and_create")
+					print("[RESTORE BUSH] ", bush.name, " -> sem active_node para ", saved_hidden_id, " → moita reservada para check_and_create")
 			elif animals_state.has(hidden_id):
 				var saved_scene_index = animals_state[hidden_id].get("scene_index", -1)
 				var saved_is_hidden = animals_state[hidden_id].get("is_hidden", false)
 				if saved_scene_index == this_scene_index and saved_is_hidden:
-					# Estado pertence a este segmento E animal está escondido — nativo pode reclamar o slot
-					animals_state[hidden_id + "_active_node"] = hidden_animal
-					print("[RESTORE BUSH] ", bush.name, " -> active node set for ", hidden_id, " (scene match, is_hidden:true)")
+					# Verificar se o animal pertence a ESTA moita ou a outra.
+					# Se foi arrastado para outra moita (bush_id diferente), este nativo é inválido.
+					var saved_bush_id = animals_state[hidden_id].get("bush_id", "")
+					var this_bush_id = get_bush_unique_id(bush)
+					if saved_bush_id == "" or saved_bush_id == this_bush_id:
+						# Estado pertence a este segmento E a esta moita — nativo pode reclamar o slot
+						animals_state[hidden_id + "_active_node"] = hidden_animal
+						print("[RESTORE BUSH] ", bush.name, " -> active node set for ", hidden_id, " (scene match, is_hidden:true, bush match)")
+					else:
+						# Animal está hidden mas foi arrastado para outra moita (bush_id:", saved_bush_id, ")
+						# Descartar este nativo para que check_and_create_missing o recrie na moita correta
+						print("[RESTORE BUSH] ", bush.name, " -> descartando nativo ", hidden_id,
+							": is_hidden=true mas pertence à moita ", saved_bush_id, " (esta moita: ", this_bush_id, ")")
+						if hidden_animal.get_parent():
+							hidden_animal.get_parent().remove_child(hidden_animal)
+						hidden_animal.queue_free()
+						bush.current_hidden_animal = null
+						bush.is_occupied = false
 				elif saved_scene_index == this_scene_index and not saved_is_hidden:
 					# Animal está LIVRE (is_hidden:false) — o bush foi revelado mas is_revealed não foi salvo corretamente.
 					# Descartar nativo e tratar bush como revelado para que check_and_create_missing restaure o animal livre.
@@ -327,10 +384,15 @@ func restore_bush_state(bush):
 					else:
 						# Nó foi destruído com o segmento anterior.
 						# Limpar active_node → check_and_create_missing vai recriar e colocar na moita certa.
+						# ANTI-BUG DUPLICAÇÃO: reservar moita para prevenir aceitação concorrente.
 						animals_state.erase(active_key)
-						print("[RESTORE BUSH] ", bush.name, " -> active_node destruído, apagado para recriação: ", hidden_animal_id)
+						bush.is_occupied = true
+						print("[RESTORE BUSH] ", bush.name, " -> active_node destruído → moita reservada para recriação: ", hidden_animal_id)
 				else:
-					print("[RESTORE BUSH] ", bush.name, " -> animal arrastado sem active_node:", hidden_animal_id)
+					# Sem active_node registrado → check_and_create_missing vai criar o nó.
+					# ANTI-BUG DUPLICAÇÃO: reservar moita para evitar aceitação acidental.
+					bush.is_occupied = true
+					print("[RESTORE BUSH] ", bush.name, " -> animal arrastado sem active_node → moita reservada: ", hidden_animal_id)
 			else:
 				print("[RESTORE BUSH] ", bush.name, " -> não revelado mas sem animal")
 	connect_bush_signals_for(bush)
@@ -406,6 +468,20 @@ func save_animal_state(animal):
 	# ONLY use find_segment_containing_position as fallback if not in a segment
 	if not target_segment:
 		target_segment = find_segment_containing_position(animal_global_pos)
+	elif infinite_scroller:
+		# Se o animal cruzou a borda do segmento (local_pos fora de [0, world_width)),
+		# precisamos redirecioná-lo ao segmento correto. Caso contrário, o animal fica
+		# salvo com local_pos > world_width e ao ser recriado após recycle fica
+		# invisível (fora da janela visível da câmera).
+		var tentative_local_x = animal_global_pos.x - current_segment.global_position.x
+		var ww: float = infinite_scroller.world_width
+		if tentative_local_x < 0.0 or tentative_local_x >= ww:
+			var pos_target = find_segment_containing_position(animal_global_pos)
+			if pos_target:
+				print("[SAVE] Boundary cross detected: local_x:", tentative_local_x, " ww:", ww,
+					" — redirecionando de scene_index:", current_segment.get_meta("scene_index", -1),
+					" para scene_index:", pos_target.get_meta("scene_index", -1))
+				target_segment = pos_target
 	
 	if not target_segment:
 		print("[SAVE ERROR] No segment found for position:", animal_global_pos)
@@ -498,6 +574,9 @@ func check_and_create_missing_animal(segment: Node2D):
 		if not k.ends_with("_active_node") and animals_state[k] is Dictionary:
 			total_state_entries += 1
 	print("[CHECK MISSING START] scene_index:", segment_scene_index, " | total animals_state entries:", total_state_entries)
+	# Executar validação no início de check_and_create para detectar estado
+	# corrompido que chegou aqui via restore_bush_state ou restore_animal_state.
+	validate_state("before_check_create s" + str(segment_scene_index))
 	
 	# Check all saved animal states
 	for animal_id in animals_state:
@@ -655,7 +734,12 @@ func create_animal_in_segment(segment: Node2D, animal_id: String, state: Diction
 	if state.get("is_hidden", false) and state.has("bush_id"):
 		var target_bush_name = state["bush_id"].trim_prefix("bush/")
 		var target_bush = segment.find_child(target_bush_name, true, false)
-		if target_bush and not target_bush.is_occupied:
+		# Aceitar se moita está livre OU se está reservada mas sem nó real
+		# (is_occupied=true + current_hidden_animal=null significa que restore_bush_state
+		# reservou a moita para prevenir race condition — é exatamente aqui que devemos colocá-lo).
+		# NÃO aceitar quando is_occupied=true + current_hidden_animal!=null: outro animal já está lá.
+		var bush_is_reserved: bool = target_bush != null and target_bush.is_occupied and not target_bush.current_hidden_animal
+		if target_bush and (not target_bush.is_occupied or bush_is_reserved):
 			plane.add_child(animal)
 			animal.name = animal_name
 			animal.current_plane = state["plane"]
@@ -666,10 +750,11 @@ func create_animal_in_segment(segment: Node2D, animal_id: String, state: Diction
 			await get_tree().process_frame
 			reconnect_animal_signals(animal)
 			print("[CREATE MISSING HIDDEN] ", animal_name, " recriado e escondido em ", target_bush_name,
-				" | scene_index:", segment.get_meta("scene_index", -1))
+				" | scene_index:", segment.get_meta("scene_index", -1),
+				(" (moita estava reservada)" if bush_is_reserved else ""))
 			return
 		else:
-			print("[CREATE MISSING HIDDEN] Bush '", target_bush_name, "' não disponível — criando visível")
+			print("[CREATE MISSING HIDDEN] Bush '", target_bush_name, "' não disponível (is_occupied:", (target_bush.is_occupied if target_bush else "N/A"), " hidden_animal:", (str(target_bush.current_hidden_animal.name) if target_bush and target_bush.current_hidden_animal else "null"), ") — criando visível")
 
 	# Add to plane (animal visível ou bush não disponível)
 	var name_before_add = animal.name
@@ -766,15 +851,36 @@ func save_animal_state_for_recycle(animal):
 	if not scene_path:
 		scene_path = "res://scenes/components/capivara.tscn"
 
+	# Verificar se o animal cruzou a borda do segmento (local_pos fora de [0, world_width)).
+	# Se cruzou, recalcular scene_index e local_pos relativos ao segmento correto.
+	var corrected_scene_index: int = segment_scene_index
+	var corrected_local_pos: Vector2 = animal.position
+	if infinite_scroller:
+		var ww: float = infinite_scroller.world_width
+		if animal.position.x < 0.0 or animal.position.x >= ww:
+			var global_pos_animal = animal.global_position
+			var correct_seg = find_segment_containing_position(global_pos_animal)
+			if correct_seg:
+				corrected_scene_index = correct_seg.get_meta("scene_index", segment_scene_index)
+				corrected_local_pos = global_pos_animal - correct_seg.global_position
+				print("[SAVE RECYCLE] Boundary cross: local_x:", animal.position.x, " ww:", ww,
+					" — redirecionando de scene_index:", segment_scene_index,
+					" para scene_index:", corrected_scene_index,
+					" | new local_pos:", corrected_local_pos)
+
 	animals_state[animal_id] = {
 		"plane": animal.current_plane,
-		"scene_index": segment_scene_index,
-		"local_position": animal.position,
+		"scene_index": corrected_scene_index,
+		"local_position": corrected_local_pos,
 		"scale": animal.scale,
 		"is_hidden": animal.is_hidden,
 		"scene_path": scene_path
 	}
-	print("[SAVE RECYCLE] id:", animal_id, "| scene_index:", segment_scene_index, "| local_pos:", animal.position)
+	print("[SAVE RECYCLE] id:", animal_id, "| scene_index:", segment_scene_index, "| local_pos:", animal.position,
+		" | global_pos:", animal.global_position,
+		" | is_falling:", animal.get("is_falling"),
+		" | is_being_dragged:", animal.get("is_being_dragged"),
+		" | visible:", animal.visible)
 
 func restore_animal_state(animal):
 	var animal_id = get_animal_unique_id(animal)
@@ -793,7 +899,13 @@ func restore_animal_state(animal):
 			if animal.has_node("Area2D"):
 				animal.get_node("Area2D").set_deferred("monitoring", false)
 				animal.get_node("Area2D").set_deferred("monitorable", false)
-			print("[RESTORE] HIDING - another instance already active")
+			print("[RESTORE] HIDING - another instance already active:", active_animal.name,
+				" | active.valid:", is_instance_valid(active_animal),
+				" | active.in_tree:", active_animal.is_inside_tree(),
+				" | active.visible:", active_animal.visible,
+				" | active.global_pos:", active_animal.global_position,
+				" | this.name:", animal.name,
+				" | this.global_pos:", animal.global_position)
 			return false
 	
 	# No active instance yet - mark this as active
@@ -853,7 +965,9 @@ func restore_animal_state(animal):
 		print("[RESTORE] id:", animal_id, "| plane:", state["plane"], "| final_global_pos:", animal.global_position, "| ACTIVE")
 		# Verificar gravidade após restaurar a posição (animal pode estar acima da terra).
 		if animal.has_method("apply_gravity"):
-			animal.apply_gravity()
+			var gravity_started: bool = animal.apply_gravity()
+			if not gravity_started:
+				print("[RESTORE GRAVITY] SKIP — apply_gravity=false | feet_y calculado pelo animal | global_y:", animal.global_position.y)
 		return true
 	else:
 		# First time - save initial state based on which segment animal was created in
@@ -982,6 +1096,64 @@ func reconnect_animal_signals(animal):
 		animal.animal_drag_ended.connect(_on_animal_drag_ended)
 	if animal.has_signal("animal_clicked"):
 		animal.animal_clicked.connect(_on_animal_clicked)
+
+# ─── Pré-posicionamento síncrono (anti-flicker) ───────────────────────────────
+
+## Posiciona o animal nativo na posição salva SINCRONAMENTE, logo após add_child
+## do novo segmento, antes de qualquer frame renderizar. Elimina o flicker de 2
+## frames causado pelo await process_frame em restore_segment_animals.
+## Retorna true se conseguiu posicionar (animal tem estado salvo neste segmento).
+## Retorna false se não há estado salvo → caller deve ocultar o animal.
+func pre_restore_animal_position(animal) -> bool:
+	var animal_id = get_animal_unique_id(animal)
+	if not animals_state.has(animal_id):
+		return false  # primeira vez — sem estado salvo
+	var state = animals_state[animal_id]
+	if not state is Dictionary:
+		return false
+	if state.get("is_hidden", false):
+		return false  # animal está dentro de um bush — ocultar é correto
+	var segment = get_segment_for_animal(animal)
+	if not segment:
+		return false
+	var this_scene_index: int = segment.get_meta("scene_index", -1)
+	var saved_scene_index: int = state.get("scene_index", -1)
+	if this_scene_index != saved_scene_index:
+		return false  # estado pertence a outro segmento
+	animal.current_plane = state["plane"]
+	animal.position = state["local_position"]
+	animal.scale = state["scale"]
+	animal.is_hidden = false
+	animal.visible = true
+	if animal.current_plane == "plane2":
+		animal.z_index = 100
+	else:
+		animal.z_index = 200
+	if animal.has_method("_sync_visual_to_plane"):
+		animal._sync_visual_to_plane()
+	print("[PRE-RESTORE] ", animal.name, " → local_pos:", animal.position, " | global_pos:", animal.global_position)
+	return true
+
+# ─── Debug: validação de invariantes ─────────────────────────────────────────
+
+## Valida todas as invariantes internas do WorldManager.
+## Só executa em builds de debug (OS.is_debug_build()). Retorna true se OK.
+## Registra erros via push_error() e imprime resumo no Output.
+func validate_state(label: String = "") -> bool:
+	if not OS.is_debug_build():
+		return true
+	if not _validator:
+		var ValidatorScript = load("res://scripts/world_state_validator.gd")
+		if ValidatorScript:
+			_validator = ValidatorScript.new()
+		else:
+			push_error("[VALIDATOR] Não foi possível carregar world_state_validator.gd")
+			return true
+	if _validator:
+		return _validator.validate(self, label)
+	return true
+
+# ─────────────────────────────────────────────────────────────────────────────
 
 func _on_animal_clicked(_animal):
 	is_dragging = false
