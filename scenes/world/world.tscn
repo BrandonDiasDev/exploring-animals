@@ -6,6 +6,8 @@
 [ext_resource type="PackedScene" uid="uid://c43px4eeuf2it" path="res://scenes/world/world_segment_2.tscn" id="4_v5dby"]
 [ext_resource type="PackedScene" uid="uid://l7q234c8jywh" path="res://scenes/world/world_segment_3.tscn" id="5_t5ptc"]
 [ext_resource type="Script" uid="uid://bi1eq26pejj8j" path="res://scripts/plane_guide.gd" id="5_v5dby"]
+[ext_resource type="PackedScene" uid="uid://w48vh7d8hp5e" path="res://scenes/world/world_segment_4.tscn" id="6_gb53w"]
+[ext_resource type="PackedScene" uid="uid://df5pfpm4gee2e" path="res://scenes/world/world_segment_5.tscn" id="7_5qq27"]
 [ext_resource type="Script" uid="uid://d1yxnl41pesl5" path="res://scripts/world_clip_overlay.gd" id="8_overlay"]
 [ext_resource type="Script" uid="uid://dlhmoye2clmrs" path="res://tests/test_world_scenarios.gd" id="9_testrunner"]
 
@@ -17,7 +19,7 @@ position = Vector2(960, 703)
 
 [node name="InfiniteScroller" type="Node2D" parent="." unique_id=758310692]
 script = ExtResource("2_1fp7r")
-segment_scenes = Array[PackedScene]([ExtResource("3_6m72w"), ExtResource("4_v5dby"), ExtResource("5_t5ptc")])
+segment_scenes = Array[PackedScene]([ExtResource("3_6m72w"), ExtResource("4_v5dby"), ExtResource("5_t5ptc"), ExtResource("6_gb53w"), ExtResource("7_5qq27")])
 
 [node name="PlaneGuide" type="CanvasLayer" parent="." unique_id=1630197728]
 

@@ -171,7 +171,7 @@ func _check_hidden_state_node_consistency(wm: Node) -> void:
 		var active_key := key + "_active_node"
 		if not animals_state.has(active_key):
 			continue
-		var node: Node = animals_state[active_key]
+		var node = animals_state[active_key]  # untyped: typed assignment throws on freed instances before is_instance_valid runs
 		if not is_instance_valid(node):
 			continue
 		var node_is_hidden: bool = node.get("is_hidden")

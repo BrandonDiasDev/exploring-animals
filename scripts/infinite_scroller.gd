@@ -163,11 +163,12 @@ func recycle_segment(index: int, new_x: float) -> void:
 	for bush in bushes_before:
 		if world_manager and world_manager.has_method("save_bush_state"):
 			world_manager.save_bush_state(bush)
-		# Animals originally instantiated inside the bush ARE children of the bush node.
-		# find_animals_recursive skips inside bushes, so we handle them explicitly here.
-		# We only LOG them — their state is managed by save_bush_state + restore path.
+		# Animals inside bushes are skipped by find_animals_recursive (managed_by_bush),
+		# so their _active_node must be cleared explicitly here before the segment is freed.
 		var hidden_animal = bush.get("current_hidden_animal")
-		if hidden_animal:
+		if hidden_animal and is_instance_valid(hidden_animal):
+			if world_manager and world_manager.has_method("clear_active_animal"):
+				world_manager.clear_active_animal(hidden_animal)
 			var in_bush_node = (hidden_animal.get_parent() == bush)
 			print("[SEGMENT RECYCLE] Bush ", bush.name, " hidden_animal:", hidden_animal.name,
 				" | is_child_of_bush:", in_bush_node, " | visible:", hidden_animal.visible,
