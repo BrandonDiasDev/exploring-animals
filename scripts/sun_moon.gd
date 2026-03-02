@@ -14,10 +14,16 @@ const MOON_PATH := "res://assets/backgrounds/moon.png"
 
 # ── Parâmetros visuais ────────────────────────────────────────────────────────
 ## Tamanho dos ícones em pixels.
-const ICON_SIZE := Vector2(50.0, 50.0)
+const ICON_SIZE := Vector2(80.0, 80.0)
 
-## Posição relativa à viewport (0–1).  (0.80, 0.06) = topo-direita do céu.
-const POS_ANCHOR := Vector2(1, 1)
+# ── Parâmetros de posicionamento ─────────────────────────────────────────────
+## Margem em relação à borda direita da tela (pixels).
+const MARGIN_RIGHT         := 450.0
+## Quantos pixels o ícone fica abaixo do topo da tela (mínimo).
+const MARGIN_TOP           := 30.0
+## Quantos pixels o centro do ícone fica ACIMA da skyline.
+## Aumente se o ícone ficar próximo demais da skyline; diminua para afastar do topo.
+const MARGIN_ABOVE_SKYLINE := 150.0
 
 # ── Parâmetros de animação ────────────────────────────────────────────────────
 ## Duração do pôr/nascer em segundos.
@@ -38,9 +44,8 @@ var _moon: TextureRect
 var _is_day:    bool  = true
 var _animating: bool  = false
 
-## Y base de cada astro na tela (recalculado ao redimensionar).
-var _sun_base_y:  float = 0.0
-var _moon_base_y: float = 0.0
+## Y base dos astros na tela (recalculado ao redimensionar / por frame).
+var _base_y: float = 0.0
 
 # ─────────────────────────────────────────────────────────────────────────────
 func _ready() -> void:
@@ -60,9 +65,20 @@ func _ready() -> void:
 	_sun.gui_input.connect(_on_sun_input)
 	_moon.gui_input.connect(_on_moon_input)
 
-	# Aguarda um frame para que `size` reflita a viewport real.
+	# Aguarda um frame para que `size` e a câmera reflitam a cena real.
 	await get_tree().process_frame
 	_place_icons()
+
+# ─────────────────────────────────────────────────────────────────────────────
+func _process(_delta: float) -> void:
+	# Recalcula posição a cada frame — garante que zoom/câmera sejam respeitados.
+	# Se não estiver animando, move os ícones junto.
+	var new_pos := _compute_position()
+	if new_pos != Vector2(_sun.position.x, _base_y):
+		_base_y = new_pos.y
+		if not _animating:
+			_sun.position  = new_pos
+			_moon.position = new_pos
 
 # ─────────────────────────────────────────────────────────────────────────────
 func _make_icon(path: String, node_name: String) -> TextureRect:
@@ -76,14 +92,33 @@ func _make_icon(path: String, node_name: String) -> TextureRect:
 	return tr
 
 # ─────────────────────────────────────────────────────────────────────────────
-## Posiciona os dois ícones no ponto âncora da viewport.
+## Calcula a posição-alvo do ícone em coordenadas de tela.
+func _compute_position() -> Vector2:
+	var vp  := get_viewport_rect().size
+	var cam := get_viewport().get_camera_2d()
+
+	var icon_x := vp.x - MARGIN_RIGHT - ICON_SIZE.x
+	var icon_y : float
+
+	if cam:
+		var cfg       := get_node_or_null("/root/WorldConfig")
+		var skyline_y : float = cfg.skyline_y if cfg else -444.0
+		# Converte Y do mundo para Y da tela
+		var screen_sky_y := (skyline_y - cam.global_position.y) * cam.zoom.y + vp.y * 0.5
+		icon_y = screen_sky_y - MARGIN_ABOVE_SKYLINE - ICON_SIZE.y
+	else:
+		icon_y = vp.y * 0.10  # fallback sem câmera
+
+	# Garante que nunca sai pela parte de cima da tela
+	icon_y = maxf(icon_y, MARGIN_TOP)
+
+	return Vector2(icon_x, icon_y)
+
 func _place_icons() -> void:
-	var sz  := size  # = tamanho da viewport por cause do PRESET_FULL_RECT
-	var pos := Vector2(sz.x * POS_ANCHOR.x, sz.y * POS_ANCHOR.y)
+	var pos    := _compute_position()
+	_base_y    = pos.y
 	_sun.position  = pos
 	_moon.position = pos
-	_sun_base_y    = pos.y
-	_moon_base_y   = pos.y
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED:
@@ -115,7 +150,7 @@ func _animate_transition(to_day: bool) -> void:
 
 	var leaving  : TextureRect = _sun  if not to_day else _moon
 	var arriving : TextureRect = _moon if not to_day else _sun
-	var base_y   : float       = (_sun_base_y if not to_day else _moon_base_y)
+	var base_y   : float       = _base_y
 
 	# ── 1. Pôr: desce e desaparece ────────────────────────────────────────────
 	var tw_out := create_tween()
@@ -126,7 +161,7 @@ func _animate_transition(to_day: bool) -> void:
 	await tw_out.finished
 
 	leaving.visible    = false
-	leaving.position.y = base_y    # reseta para a posição base
+	leaving.position.y = _base_y   # reseta para a posição base (pode ter mudado)
 	leaving.modulate.a = 1.0
 
 	# ── 2. Nascer: sobe e aparece ─────────────────────────────────────────────
