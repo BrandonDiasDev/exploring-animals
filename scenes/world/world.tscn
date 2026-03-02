@@ -10,6 +10,7 @@
 [ext_resource type="PackedScene" uid="uid://df5pfpm4gee2e" path="res://scenes/world/world_segment_5.tscn" id="7_5qq27"]
 [ext_resource type="Script" uid="uid://d1yxnl41pesl5" path="res://scripts/world_clip_overlay.gd" id="8_overlay"]
 [ext_resource type="Script" uid="uid://dlhmoye2clmrs" path="res://tests/test_world_scenarios.gd" id="9_testrunner"]
+[ext_resource type="Script" path="res://scripts/sun_moon.gd" id="10_sunmoon"]
 
 [node name="World" type="Node2D" unique_id=1902873090]
 script = ExtResource("1_dphjl")
@@ -47,6 +48,12 @@ layer = 10
 script = ExtResource("8_overlay")
 
 [node name="UI" type="CanvasLayer" parent="." unique_id=1062544911]
+
+[node name="Sky" type="CanvasLayer" parent="." unique_id=998877665]
+layer = 15
+
+[node name="SunMoon" type="Control" parent="Sky" unique_id=112233445]
+script = ExtResource("10_sunmoon")
 
 [node name="TestRunner" type="Node" parent="." unique_id=1223111155]
 script = ExtResource("9_testrunner")
