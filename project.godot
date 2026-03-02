@@ -19,6 +19,10 @@ run/main_scene="uid://bdqhlfem7thcq"
 config/features=PackedStringArray("4.6", "Mobile")
 config/icon="res://icon.svg"
 
+[autoload]
+
+WorldConfig="*res://scripts/world_config.gd"
+
 [debug]
 
 settings/stdout/verbose_stdout=true
@@ -34,7 +38,3 @@ window/size/window_width_override=800
 window/size/window_height_override=800
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
-
-[autoload]
-
-WorldConfig="*res://scripts/world_config.gd"

@@ -36,6 +36,7 @@ func validate(wm: Node, label: String = "", silent: bool = false) -> bool:
 	_check_no_double_hiding(wm)
 	_check_double_bush_claim(wm)
 	_check_state_count_sanity(wm)
+	_check_local_pos_in_bounds(wm)
 
 	var prefix := "[VALIDATOR%s]" % (" <%s>" % label if label != "" else "")
 
@@ -182,13 +183,13 @@ func _check_hidden_state_node_consistency(wm: Node) -> void:
 				("animals_state['%s'].is_hidden=true mas o nó '%s' está visível e livre "
 				+ "(sem managed_by_bush). Estado do dicionário e do nó divergiram.") % [key, node.name]
 			)
-		elif not node_is_hidden:
-			# Divergência durante animação de entrada na moita — transitório
+		elif not node_is_hidden and not in_transition:
+			# Nó não está escondido mas também não está em transição — estado incoerente
 			warnings.append(
-				("animals_state['%s'].is_hidden=true mas o nó '%s' ainda tem is_hidden=false. "
-				+ "in_transition(managed_by_bush)=%s — provavelmente animação _accept_animal em curso.") \
-				% [key, node.name, str(in_transition)]
+				("animals_state['%s'].is_hidden=true mas o nó '%s' ainda tem is_hidden=false "
+				+ "e não está em transição (sem managed_by_bush).") % [key, node.name]
 			)
+		# Se in_transition=true: animação _accept_animal em curso, divergência esperada — sem aviso.
 
 
 # ─── Verificação 6 — animal escondido em dois arbustos simultâneos ────────────
@@ -245,6 +246,36 @@ func _check_double_bush_claim(wm: Node) -> void:
 			)
 		else:
 			bush_claims[bid] = key
+
+
+# ─── Verificação 10 — local_pos dentro dos limites do segmento ──────────────
+
+func _check_local_pos_in_bounds(wm: Node) -> void:
+	## local_position.x de animais livres deve estar em [0, world_width).
+	## Se estiver fora, o animal será recriado fora da câmera após o próximo recycle.
+	## Cenários: arrastar um animal além da borda de um segmento sem detecção de cruzamento.
+	var infinite_scroller = wm.get("infinite_scroller")
+	if not infinite_scroller:
+		return
+	var ww: float = infinite_scroller.get("world_width")
+	if ww <= 0.0:
+		return
+	var animals_state: Dictionary = wm.animals_state
+	for key: String in animals_state.keys():
+		if key.ends_with("_active_node"):
+			continue
+		var state = animals_state[key]
+		if not state is Dictionary:
+			continue
+		if state.get("is_hidden", false):
+			continue  # animal escondido numa moita — position relativa ao nó do bush, não ao segmento
+		var lpos: Vector2 = state.get("local_position", Vector2.ZERO)
+		if lpos.x <= -ww or lpos.x >= ww:
+			errors.append(
+				("ID '%s' tem local_position.x=%.1f fora de (%.0f, %.0f). "
+				+ "Animal ficará invisível ao ser recriado — cruzou borda do segmento sem correção.") \
+				% [key, lpos.x, -ww, ww]
+			)
 
 
 # ─── Verificação 9 — acúmulo excessivo de entradas em animals_state ──────────

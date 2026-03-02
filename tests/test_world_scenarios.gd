@@ -80,6 +80,11 @@ func run_all() -> void:
 	# ── Grupo 4: Múltiplas voltas ─────────────────────────────────────────────
 	await _run("G4-A — contagem de entradas dentro do limite",      _g4a_state_count)
 
+	# ── Grupo 5: Posicionamento entre segmentos (boundary crossing) ────────────
+	await _run("G5-A — nenhum local_pos fora dos limites no state atual",     _g5a_no_out_of_bounds_local_pos)
+	await _run("G5-B — validador detecta local_pos injetado além da borda",   _g5b_boundary_injection_detected)
+	await _run("G5-C — save_animal_state corrige cruzamento de borda real",   _g5c_boundary_save_correction)
+
 	# ── Grupo 6: Estados inconsistentes ──────────────────────────────────────
 	await _run("G6-A — is_animal_being_dragged não vazou",          _g6a_no_drag_flag_leak)
 	await _run("G6-B — nenhum animal escondido em dois arbustos",   _g6b_no_double_hiding)
@@ -302,6 +307,100 @@ func _g4a_state_count() -> void:
 	var LIMIT := 30
 	_assert(count <= LIMIT,
 		"animals_state tem %d entradas (limite=%d) — possível acúmulo por IDs órfãos" % [count, LIMIT])
+
+
+# ── G5: Posicionamento entre segmentos ──────────────────────────────────────
+
+# G5-A: nenhum local_pos além de [0, world_width) no state atual
+func _g5a_no_out_of_bounds_local_pos() -> void:
+	if not _wm.get("infinite_scroller"):
+		_skip_test("infinite_scroller não disponível")
+		return
+	var ww: float = _wm.infinite_scroller.world_width
+	var bad: Array[String] = []
+	for key: String in _wm.animals_state.keys():
+		if key.ends_with("_active_node"):
+			continue
+		var state = _wm.animals_state[key]
+		if not state is Dictionary:
+			continue
+		if state.get("is_hidden", false):
+			continue
+		var lpos: Vector2 = state.get("local_position", Vector2.ZERO)
+		if lpos.x < 0.0 or lpos.x >= ww:
+			bad.append("'%s' local_x=%.1f" % [key, lpos.x])
+	_assert(bad.is_empty(),
+		"local_pos fora de [0, %.0f): %s" % [ww, str(bad)])
+
+
+# G5-B: validador (check 10) detecta local_pos injetado além da borda
+func _g5b_boundary_injection_detected() -> void:
+	if not _wm.get("infinite_scroller"):
+		_skip_test("infinite_scroller não disponível")
+		return
+	var ww: float = _wm.infinite_scroller.world_width
+
+	# Verificar estado atual sem injeção
+	var real_ok: bool = _validator.validate(_wm, "G5-B atual")
+	if not real_ok:
+		_assert(false, "invariante já violada antes da injeção")
+		return
+
+	# Injetar estado com local_pos fora dos limites
+	var fake_id := "animal/__test_boundary_oob__"
+	_wm.animals_state[fake_id] = {
+		"plane": "plane1", "scene_index": 0,
+		"local_position": Vector2(ww + 500.0, 300.0),
+		"scale": Vector2.ONE, "is_hidden": false, "scene_path": ""
+	}
+
+	var detected: bool = not _validator.validate(_wm, "G5-B injetado", true)
+	_wm.animals_state.erase(fake_id)
+
+	_assert(detected, "validador NÃO detectou local_pos além de [0, %.0f) — check 10 falhou" % ww)
+
+
+# G5-C: save_animal_state corrige fisicamente o cruzamento de borda
+# — move o animal além da borda, chama save, verifica que local_pos salvo voltou para [0, ww)
+func _g5c_boundary_save_correction() -> void:
+	var animal := _find_free_animal()
+	if not animal:
+		_skip_test("nenhum animal livre disponível")
+		return
+	if not _wm.get("infinite_scroller"):
+		_skip_test("infinite_scroller não disponível")
+		return
+	var ww: float = _wm.infinite_scroller.world_width
+	var original_parent: Node = animal.get_parent()
+	var original_local_pos: Vector2 = animal.position
+	var aid: String = _wm.get_animal_unique_id(animal)
+
+	# Guardar state original para restaurar ao final
+	_wm.save_animal_state(animal)
+	var original_state: Dictionary = _wm.animals_state.get(aid, {}).duplicate()
+
+	# Mover além da borda direita (ainda filho do mesmo segmento)
+	animal.position = Vector2(ww + 200.0, original_local_pos.y)
+
+	# save deve detectar o cruzamento e redirecionar para o segmento vizinho
+	_wm.save_animal_state(animal)
+
+	var saved_state: Dictionary = _wm.animals_state.get(aid, {})
+	var saved_lpos: Vector2 = saved_state.get("local_position", Vector2(-1.0, -1.0))
+	var correction_ok: bool = saved_lpos.x >= 0.0 and saved_lpos.x < ww
+
+	# Restaurar posição e parent originais
+	if is_instance_valid(animal) and animal.get_parent() != original_parent:
+		if animal.get_parent():
+			animal.get_parent().remove_child(animal)
+		original_parent.add_child(animal)
+	if is_instance_valid(animal):
+		animal.position = original_local_pos
+	_wm.animals_state[aid] = original_state
+	_wm.animals_state[aid + "_active_node"] = animal
+
+	_assert(correction_ok,
+		"save_animal_state: local_pos.x=%.1f ainda fora de [0, %.0f) após correção" % [saved_lpos.x, ww])
 
 
 # G6-A: flag de drag não deve estar vazada
