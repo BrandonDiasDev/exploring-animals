@@ -293,9 +293,9 @@ func _check_state_count_sanity(wm: Node) -> void:
 		elif animals_state[key] is Dictionary:
 			data_count += 1
 
-	# Heurística: mais de 30 entradas de dados provavelmente indica acúmulo.
-	# Ajuste conforme o número de animais do projeto.
-	var WARN_THRESHOLD := 30
+	# Heurística: IDs são por espécie (não por instância), então o máximo real é
+	# o número de espécies do projeto. WARN_THRESHOLD = 12 dá margem 3× para 4 espécies.
+	var WARN_THRESHOLD := 12
 	if data_count > WARN_THRESHOLD:
 		warnings.append(
 			"animals_state tem %d entradas de dados (normal ≤ %d). "

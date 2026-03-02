@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://brjgm5r7cqny8"]
 
 [ext_resource type="Script" uid="uid://dymxkx07niar6" path="res://scripts/animal.gd" id="1_tdua1"]
-[ext_resource type="Texture2D" uid="uid://dmn8nxjvnxv7d" path="res://assets/animals/tamanduá.png" id="2_tdua2"]
+[ext_resource type="Texture2D" uid="uid://dcbe6e64qx5oy" path="res://assets/animals/tamandua.png" id="2_h2mal"]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_tdua3"]
 radius = 43.881187
@@ -12,7 +12,7 @@ script = ExtResource("1_tdua1")
 animal_name = "Tamanduá"
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=542143413]
-texture = ExtResource("2_tdua2")
+texture = ExtResource("2_h2mal")
 
 [node name="Area2D" type="Area2D" parent="." unique_id=1000822833]
 

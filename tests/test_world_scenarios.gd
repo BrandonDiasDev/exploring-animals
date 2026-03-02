@@ -89,6 +89,11 @@ func run_all() -> void:
 	await _run("G6-A — is_animal_being_dragged não vazou",          _g6a_no_drag_flag_leak)
 	await _run("G6-B — nenhum animal escondido em dois arbustos",   _g6b_no_double_hiding)
 
+	# ── Grupo 7: Ciclo de recycle ──────────────────────────────────────────────
+	await _run("G7-A — nenhum _active_node freed após recycle",            _g7a_no_freed_active_node_after_recycle)
+	await _run("G7-B — sem IDs órfãos após recycle (colisão de nomes)",    _g7b_no_orphan_ids_after_recycle)
+	await _run("G7-C — validador OK após dois recycles consecutivos",      _g7c_validator_ok_after_two_recycles)
+
 	_footer()
 
 
@@ -303,8 +308,9 @@ func _g4a_state_count() -> void:
 	for key: String in _wm.animals_state.keys():
 		if not key.ends_with("_active_node") and _wm.animals_state[key] is Dictionary:
 			count += 1
-	# Heurística: número de espécies × 3 (segmentos) × 2 (margem) = ~24 para 4 espécies
-	var LIMIT := 30
+	# IDs de animal são por espécie (únicos), não por instância.
+	# Com 4 espécies o máximo real é 4; LIMIT=12 dá margem 3× antes de alertar acúmulo.
+	var LIMIT := 12
 	_assert(count <= LIMIT,
 		"animals_state tem %d entradas (limite=%d) — possível acúmulo por IDs órfãos" % [count, LIMIT])
 
@@ -416,6 +422,80 @@ func _g6a_no_drag_flag_leak() -> void:
 			dragging_count += 1
 	_assert(dragging_count > 0,
 		"is_animal_being_dragged=true mas nenhum animal.is_being_dragged=true (flag vazada)")
+
+
+# ── G7: Ciclo de recycle ─────────────────────────────────────────────────────
+
+# G7-A: após recycle de um segmento, nenhum _active_node aponta para nó destruído.
+# Cobre o bug onde clear_active_animal não era chamado para animais dentro de moitas.
+func _g7a_no_freed_active_node_after_recycle() -> void:
+	var scroller = _wm.get("infinite_scroller")
+	if not scroller:
+		_skip_test("infinite_scroller não disponível")
+		return
+	if scroller.segments.size() < 2:
+		_skip_test("menos de 2 segmentos ativos")
+		return
+
+	var rightmost_x: float = scroller.get_rightmost_segment_x()
+	scroller.recycle_segment(0, rightmost_x + scroller.world_width)
+
+	# Aguardar restore_segment_animals (deferred + frame de processo)
+	await get_tree().create_timer(0.35).timeout
+	await get_tree().process_frame
+
+	var freed_refs: Array[String] = []
+	for key: String in _wm.animals_state.keys():
+		if not key.ends_with("_active_node"):
+			continue
+		var node = _wm.animals_state[key]
+		if not is_instance_valid(node):
+			freed_refs.append(key)
+
+	_assert(freed_refs.is_empty(),
+		"_active_node(s) apontando para nó destruído após recycle: %s" % str(freed_refs))
+
+
+# G7-B: após recycle, nenhum ID com '@' (colisão de nomes — nó renomeado pelo Godot).
+# Cobre o bug onde queue_free deferred deixava o nó antigo na árvore durante o add_child.
+func _g7b_no_orphan_ids_after_recycle() -> void:
+	var scroller = _wm.get("infinite_scroller")
+	if not scroller:
+		_skip_test("infinite_scroller não disponível")
+		return
+	if scroller.segments.size() < 2:
+		_skip_test("menos de 2 segmentos ativos")
+		return
+
+	var rightmost_x: float = scroller.get_rightmost_segment_x()
+	scroller.recycle_segment(0, rightmost_x + scroller.world_width)
+
+	await get_tree().create_timer(0.35).timeout
+	await get_tree().process_frame
+
+	var orphans: Array[String] = []
+	for key: String in _wm.animals_state.keys():
+		if "@" in key:
+			orphans.append(key)
+	_assert(orphans.is_empty(),
+		"IDs órfãos após recycle (colisão de nomes): %s" % str(orphans))
+
+
+# G7-C: validador passa completamente após dois recycles consecutivos.
+func _g7c_validator_ok_after_two_recycles() -> void:
+	var scroller = _wm.get("infinite_scroller")
+	if not scroller:
+		_skip_test("infinite_scroller não disponível")
+		return
+
+	for _i in range(2):
+		var rightmost_x: float = scroller.get_rightmost_segment_x()
+		scroller.recycle_segment(0, rightmost_x + scroller.world_width)
+		await get_tree().create_timer(0.30).timeout
+		await get_tree().process_frame
+
+	var ok: bool = _validator.validate(_wm, "G7-C após dois recycles")
+	_assert(ok, "invariantes violadas após dois recycles consecutivos (detalhes acima)")
 
 
 # G6-B: nenhum animal duplicado em dois arbustos

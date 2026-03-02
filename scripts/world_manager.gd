@@ -707,6 +707,15 @@ func create_animal_in_segment(segment: Node2D, animal_id: String, state: Diction
 
 	# Add to plane (animal visível ou bush não disponível)
 	var name_before_add = animal.name
+	# Proactively rename any same-named node that is pending queue_free.
+	# queue_free is deferred, so the old node stays in the tree until next frame.
+	# If we add our new node with the same name, Godot renames ours to @NodeX@N,
+	# which later gets purged as an orphan ID and the animal permanently disappears.
+	var conflicting = plane.get_node_or_null(animal_name)
+	if conflicting and conflicting != animal:
+		conflicting.name = "__freeing__"
+		print("[CREATE RENAME PREVENT] Renamed conflicting node '", animal_name,
+			"' to '__freeing__' before adding new instance")
 	plane.add_child(animal)
 
 	# Godot pode renomear o nó ao adicioná-lo se já existe outro filho com o mesmo nome

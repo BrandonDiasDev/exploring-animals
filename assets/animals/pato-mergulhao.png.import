@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dmn8nxjvnxv7d"
-path="res://.godot/imported/tamanduá.png-5c76e4fbd9c2a826f39b858b2924830b.ctex"
+uid="uid://cbihnh5xw16hv"
+path="res://.godot/imported/pato-mergulhao.png-bd8064923b4fb706c8afcca7e0d1e1b2.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/animals/tamanduá.png"
-dest_files=["res://.godot/imported/tamanduá.png-5c76e4fbd9c2a826f39b858b2924830b.ctex"]
+source_file="res://assets/animals/pato-mergulhao.png"
+dest_files=["res://.godot/imported/pato-mergulhao.png-bd8064923b4fb706c8afcca7e0d1e1b2.ctex"]
 
 [params]
 

@@ -39,18 +39,25 @@ func create_segment_at_offset(offset: int) -> void:
 
 func restore_segment_animals(segment):
 	await get_tree().process_frame
-	
+
+	# O segmento pode ter sido reciclado e destruído durante o await.
+	if not is_instance_valid(segment):
+		return
+
 	var world_manager = get_tree().get_first_node_in_group("world_manager")
 	if not world_manager or not world_manager.has_method("restore_animal_state"):
 		return
-	
+
 	# First, restore any animals that already exist in the segment
 	var animals = []
 	find_animals_recursive(segment, animals)
-	
+
 	for animal in animals:
 		world_manager.restore_animal_state(animal)
-	
+
+	if not is_instance_valid(segment):
+		return
+
 	# Restaurar estado das moitas ANTES de check_and_create_missing.
 	# _rehide_animal_in_bush seta _active_node; sem isso, check_and_create_missing
 	# cria um animal solto no lugar de um que deveria continuar na moita.
@@ -59,12 +66,17 @@ func restore_segment_animals(segment):
 	for bush in bushes:
 		if world_manager.has_method("restore_bush_state"):
 			world_manager.restore_bush_state(bush)
-	
+
+	if not is_instance_valid(segment):
+		return
+
 	# Só então verificar se precisa criar animais que pertencem a esta cena
 	if world_manager.has_method("check_and_create_missing_animal"):
 		world_manager.check_and_create_missing_animal(segment)
 
 func find_animals_recursive(node, animals_array):
+	if not is_instance_valid(node):
+		return
 	if node.is_in_group("animals"):
 		# Ignorar animais gerenciados por arbusto: estão visivelmente ocultos
 		# e podem agora estar em Plane2 (não dentro do nó Bush) — não devem
@@ -78,6 +90,8 @@ func find_animals_recursive(node, animals_array):
 		find_animals_recursive(child, animals_array)
 
 func find_bushes_recursive(node, bushes_array):
+	if not is_instance_valid(node):
+		return
 	if node.is_in_group("bushes"):
 		bushes_array.append(node)
 		return  # Não descer para dentro do arbusto
