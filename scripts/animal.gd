@@ -50,13 +50,13 @@ func _sync_visual_to_plane():
 		z_index = 100
 		var expected_scale: Vector2 = cfg.plane2_scale if cfg else Vector2(0.6, 0.6)
 		if scale != expected_scale:
-			print("[SYNC PLANE] ", animal_name, " plane2: scale ", scale, " -> ", expected_scale)
+			if DebugLogger.plane: print("[SYNC PLANE] ", animal_name, " plane2: scale ", scale, " -> ", expected_scale)
 			scale = expected_scale
 	else:  # plane1
 		z_index = 200
 		var expected_scale: Vector2 = cfg.plane1_scale if cfg else Vector2(1.0, 1.0)
 		if scale != expected_scale:
-			print("[SYNC PLANE] ", animal_name, " plane1: scale ", scale, " -> ", expected_scale)
+			if DebugLogger.plane: print("[SYNC PLANE] ", animal_name, " plane1: scale ", scale, " -> ", expected_scale)
 			scale = expected_scale
 
 func _on_area_input_event(_viewport, event: InputEvent, _shape_idx):
@@ -65,13 +65,14 @@ func _on_area_input_event(_viewport, event: InputEvent, _shape_idx):
 		var mon: String = str(area2d.monitoring) if area2d else "NO_AREA"
 		var pickable: String = str(area2d.input_pickable) if area2d else "NO_AREA"
 		var parent_name: String = str(get_parent().name) if get_parent() else "NULL"
-		print("[ANIMAL AREA INPUT] ", animal_name,
-			" | is_hidden:", is_hidden,
-			" | visible:", visible,
-			" | z_index:", z_index,
-			" | monitoring:", mon,
-			" | input_pickable:", pickable,
-			" | parent:", parent_name)
+		if DebugLogger.input:
+			print("[ANIMAL AREA INPUT] ", animal_name,
+				" | is_hidden:", is_hidden,
+				" | visible:", visible,
+				" | z_index:", z_index,
+				" | monitoring:", mon,
+				" | input_pickable:", pickable,
+				" | parent:", parent_name)
 
 	if is_hidden:
 		return
@@ -115,15 +116,15 @@ func handle_mouse_release():
 	if is_pressed:
 		if press_timer < LONG_PRESS_TIME:
 			# Clique simples
-			print("[INPUT] ", animal_name, " >> CLICK | timer:", "%.3f" % timer_snapshot, " | was_dragging:", was_dragging)
+			if DebugLogger.drag: print("[INPUT] ", animal_name, " >> CLICK | timer:", "%.3f" % timer_snapshot, " | was_dragging:", was_dragging)
 			on_click()
 		else:
 			# Long press - terminou o drag
 			if is_being_dragged:
-				print("[INPUT] ", animal_name, " >> DRAG END | timer:", "%.3f" % timer_snapshot, " | gpos:", global_position)
+				if DebugLogger.drag: print("[INPUT] ", animal_name, " >> DRAG END | timer:", "%.3f" % timer_snapshot, " | gpos:", global_position)
 				end_drag()
 			else:
-				print("[INPUT] ", animal_name, " >> LONG HOLD (sem drag) | timer:", "%.3f" % timer_snapshot)
+				if DebugLogger.drag: print("[INPUT] ", animal_name, " >> LONG HOLD (sem drag) | timer:", "%.3f" % timer_snapshot)
 		is_pressed = false
 		press_timer = 0.0
 
@@ -151,7 +152,7 @@ func start_drag():
 		return
 	
 	_cancel_fall()  # Pode estar caindo; drag assume controle
-	print("[DRAG START] Animal:", animal_name, "| pos:", position)
+	if DebugLogger.drag: print("[DRAG START] Animal:", animal_name, "| pos:", position)
 	is_being_dragged = true
 	drag_offset = global_position - get_global_mouse_position()
 	
@@ -164,7 +165,7 @@ func end_drag():
 	if not is_being_dragged:
 		return
 	
-	print("[DRAG END] Animal:", animal_name, " | gpos:", global_position)
+	if DebugLogger.drag: print("[DRAG END] Animal:", animal_name, " | gpos:", global_position)
 	is_being_dragged = false
 	
 	modulate = Color(1, 1, 1, 1)
@@ -200,9 +201,10 @@ func _check_bush_drop() -> String:
 	for bush in bushes:
 		var overlapping = area.overlaps_area(bush.area)
 		var occupied_str = "ocupada" if bush.is_occupied else "livre"
-		print("[BUSH DROP] ", animal_name, " -> ", bush.name,
-			" overlap:", overlapping,
-			" (", occupied_str, ")")
+		if DebugLogger.drag:
+			print("[BUSH DROP] ", animal_name, " -> ", bush.name,
+				" overlap:", overlapping,
+				" (", occupied_str, ")")
 		if overlapping:
 			var result = bush.try_accept_animal(self)
 			return "accepted" if result else "rejected"
@@ -220,9 +222,10 @@ func bounce_away_from(source_pos: Vector2):
 	var arc_peak = global_position + dir * bounce_dist * 0.5 + Vector2(0, -90)
 	var target = global_position + dir * bounce_dist
 	
-	print("[BOUNCE] ", animal_name, " dir:", "(%.2f,%.2f)" % [dir.x, dir.y],
-		" dist:", "%.0f" % bounce_dist,
-		" from:", global_position, " to:", "(%.0f,%.0f)" % [target.x, target.y])
+	if DebugLogger.drag:
+		print("[BOUNCE] ", animal_name, " dir:", "(%.2f,%.2f)" % [dir.x, dir.y],
+			" dist:", "%.0f" % bounce_dist,
+			" from:", global_position, " to:", "(%.0f,%.0f)" % [target.x, target.y])
 	
 	# Pop de escala: feedback visual de rejeição
 	var scale_tween = create_tween()
@@ -238,7 +241,7 @@ func bounce_away_from(source_pos: Vector2):
 	
 	await move_tween.finished
 	
-	print("[BOUNCE] ", animal_name, " pousou em:", global_position)
+	if DebugLogger.drag: print("[BOUNCE] ", animal_name, " pousou em:", global_position)
 
 	# Ajustar plano e salvar estado na posição final
 	check_plane_change()
@@ -276,8 +279,9 @@ func check_plane_change():
 		new_plane = "plane1"
 	
 	if current_plane != new_plane:
-		print("[PLANE CHANGE] ", current_plane, " -> ", new_plane,
-			" | feet_y:", "%.0f" % feet_y, " | division_y:", "%.0f" % division_y)
+		if DebugLogger.plane:
+			print("[PLANE CHANGE] ", current_plane, " -> ", new_plane,
+				" | feet_y:", "%.0f" % feet_y, " | division_y:", "%.0f" % division_y)
 		change_to_plane(new_plane)
 
 func change_to_plane(new_plane: String):
@@ -336,7 +340,7 @@ func _reparent_to_plane(target_plane_name: String):
 	current_parent.remove_child(self)
 	target_plane.add_child(self)
 	global_position = gpos
-	print("[REPARENT PLANE] ", animal_name, " ", current_parent.name, " -> ", target_node_name)
+	if DebugLogger.plane: print("[REPARENT PLANE] ", animal_name, " ", current_parent.name, " -> ", target_node_name)
 
 # ── Gravidade ─────────────────────────────────────────────────────────────────
 
@@ -387,10 +391,11 @@ func apply_gravity() -> bool:
 	fall_tween.tween_property(self, "position:y", target_local_y, fall_duration)
 	fall_tween.tween_callback(_on_fall_finished)
 
-	print("[GRAVITY] ", animal_name,
-		" caindo de feet_y:", "%.0f" % feet_y,
-		" -> target_feet_y:", "%.0f" % target_feet_y,
-		" | duracao:", "%.2f" % fall_duration, "s")
+	if DebugLogger.gravity:
+		print("[GRAVITY] ", animal_name,
+			" caindo de feet_y:", "%.0f" % feet_y,
+			" -> target_feet_y:", "%.0f" % target_feet_y,
+			" | duracao:", "%.2f" % fall_duration, "s")
 	return true
 
 func _cancel_fall():
@@ -401,13 +406,13 @@ func _cancel_fall():
 		fall_tween.kill()
 	fall_tween = null
 	is_falling = false
-	print("[GRAVITY CANCEL] ", animal_name, " em y:", "%.0f" % global_position.y)
+	if DebugLogger.gravity: print("[GRAVITY CANCEL] ", animal_name, " em y:", "%.0f" % global_position.y)
 
 func _on_fall_finished():
 	"""Callback do tween de queda. Ajusta plano e salva estado."""
 	is_falling = false
 	fall_tween = null
-	print("[GRAVITY LAND] ", animal_name, " pousou em y:", "%.0f" % global_position.y)
+	if DebugLogger.gravity: print("[GRAVITY LAND] ", animal_name, " pousou em y:", "%.0f" % global_position.y)
 	check_plane_change()
 	var world_manager := get_tree().get_first_node_in_group("world_manager")
 	if world_manager and world_manager.has_method("save_animal_state"):

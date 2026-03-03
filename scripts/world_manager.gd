@@ -79,7 +79,7 @@ func _on_bush_accepted_animal(animal: Animal, bush: Bush):
 	var animal_id = get_animal_unique_id(animal)
 	var segment = get_node_or_null_in_parents(bush)
 	if not segment:
-		print("[BUSH ACCEPT WM] ", animal_id, " -> sem segmento para bush:", bush.name)
+		if DebugLogger.bush: print("[BUSH ACCEPT WM] ", animal_id, " -> sem segmento para bush:", bush.name)
 		return
 	var new_scene_index = segment.get_meta("scene_index", -1)
 	var bush_id = get_bush_unique_id(bush)
@@ -93,8 +93,9 @@ func _on_bush_accepted_animal(animal: Animal, bush: Bush):
 		animals_state[animal_id]["local_position"] = local_pos_approx
 		animals_state[animal_id]["is_hidden"] = true
 		animals_state[animal_id]["bush_id"] = bush_id
-		print("[BUSH ACCEPT WM] ", animal_id, " scene_index:", old_index, " -> ", new_scene_index,
-			" | bush_id:", bush_id, " | is_hidden:true | local_pos_approx:", local_pos_approx)
+		if DebugLogger.bush:
+			print("[BUSH ACCEPT WM] ", animal_id, " scene_index:", old_index, " -> ", new_scene_index,
+				" | bush_id:", bush_id, " | is_hidden:true | local_pos_approx:", local_pos_approx)
 	else:
 		# Sem estado prévio (ex: animal nativo saindo pela primeira vez)
 		var scene_path = animal.scene_file_path
@@ -109,13 +110,13 @@ func _on_bush_accepted_animal(animal: Animal, bush: Bush):
 			"scale": animal.scale,
 			"scene_path": scene_path
 		}
-		print("[BUSH ACCEPT WM] ", animal_id, " novo estado | scene_index:", new_scene_index, " | bush_id:", bush_id)
+		if DebugLogger.bush: print("[BUSH ACCEPT WM] ", animal_id, " novo estado | scene_index:", new_scene_index, " | bush_id:", bush_id)
 
 	# A moita aceitou o animal: o drag terminou definitivamente (sem bounce).
 	# Limpar a flag aqui antes de validar, pois o timer de 0.5s em _on_animal_drag_ended
 	# ainda não expirou e causaria um falso erro de "flag vazada".
 	if is_animal_being_dragged:
-		print("[BUSH ACCEPT WM] is_animal_being_dragged = false (drag encerrado via moita)")
+		if DebugLogger.bush: print("[BUSH ACCEPT WM] is_animal_being_dragged = false (drag encerrado via moita)")
 		is_animal_being_dragged = false
 
 	validate_state("after_bush_accept")
@@ -131,7 +132,7 @@ func _on_bush_animal_revealed(animal: Animal):
 	var animal_id = get_animal_unique_id(animal)
 	var segment = get_segment_for_animal(animal)
 	if not segment:
-		print("[BUSH REVEAL ERROR] No segment found for ", animal_id)
+		if DebugLogger.bush: print("[BUSH REVEAL ERROR] No segment found for ", animal_id)
 		return
 	
 	# bush.gd already set animal.current_plane to the correct plane before emitting the signal
@@ -141,9 +142,9 @@ func _on_bush_animal_revealed(animal: Animal):
 	var target_plane_name = "Plane" + plane_number
 	var target_plane = segment.get_node_or_null(target_plane_name)
 	if not target_plane:
-		print("[BUSH REVEAL ERROR] Plane '", target_plane_name, "' not found in segment")
+		if DebugLogger.bush: print("[BUSH REVEAL ERROR] Plane '", target_plane_name, "' not found in segment")
 		return
-	print("[BUSH REVEAL] animal:", animal_id, " | inherited_plane:", inherited_plane, " | scale_before_reparent:", animal.scale)
+	if DebugLogger.bush: print("[BUSH REVEAL] animal:", animal_id, " | inherited_plane:", inherited_plane, " | scale_before_reparent:", animal.scale)
 	
 	# Store current global position before reparenting
 	var global_pos = animal.global_position
@@ -159,7 +160,7 @@ func _on_bush_animal_revealed(animal: Animal):
 		# independente da ordem em que foram adicionados anteriormente.
 		if old_parent:
 			old_parent.move_child(animal, old_parent.get_child_count() - 1)
-			print("[BUSH REVEAL REPARENT] move_child: ", animal_id, " -> fim de ", old_parent.name)
+			if DebugLogger.bush: print("[BUSH REVEAL REPARENT] move_child: ", animal_id, " -> fim de ", old_parent.name)
 	animal.global_position = global_pos  # Preserve world position
 	
 	# Sync visual properties to the new plane
@@ -167,16 +168,17 @@ func _on_bush_animal_revealed(animal: Animal):
 	
 	var wm_area = animal.get_node_or_null("Area2D")
 	var wm_parent = animal.get_parent()
-	print("[BUSH REVEAL REPARENT] ", animal_id, " reparented to ", target_plane_name,
-		" (inherited plane:", inherited_plane,
-		") in scene_index:", segment.get_meta("scene_index", -1),
-		" | animal.z_index:", animal.z_index,
-		" | parent.z_index:", (wm_parent.z_index if wm_parent else "N/A"),
-		" | parent.z_as_relative:", (wm_parent.z_as_relative if wm_parent else "N/A"),
-		" | area.monitoring:", (wm_area.monitoring if wm_area else "NO_AREA"),
-		" | area.input_pickable:", (wm_area.input_pickable if wm_area else "NO_AREA"),
-		" | animal.visible:", animal.visible,
-		" | animal.is_hidden:", animal.is_hidden)
+	if DebugLogger.bush:
+		print("[BUSH REVEAL REPARENT] ", animal_id, " reparented to ", target_plane_name,
+			" (inherited plane:", inherited_plane,
+			") in scene_index:", segment.get_meta("scene_index", -1),
+			" | animal.z_index:", animal.z_index,
+			" | parent.z_index:", (wm_parent.z_index if wm_parent else "N/A"),
+			" | parent.z_as_relative:", (wm_parent.z_as_relative if wm_parent else "N/A"),
+			" | area.monitoring:", (wm_area.monitoring if wm_area else "NO_AREA"),
+			" | area.input_pickable:", (wm_area.input_pickable if wm_area else "NO_AREA"),
+			" | animal.visible:", animal.visible,
+			" | animal.is_hidden:", animal.is_hidden)
 
 	# Verificar estado 1 frame depois (após set_deferred do monitoring aplicar)
 	call_deferred("_log_reveal_next_frame", animal, animal_id)
@@ -199,13 +201,13 @@ func _on_bush_animal_revealed(animal: Animal):
 			"scene_path": scene_path
 		}
 		animals_state[animal_id + "_active_node"] = animal
-		print("[BUSH REVEAL] Registered animal:", animal_id, "| plane:", animal.current_plane, "| is_hidden:false")
+		if DebugLogger.bush: print("[BUSH REVEAL] Registered animal:", animal_id, "| plane:", animal.current_plane, "| is_hidden:false")
 	else:
 		# Estado já existe (animal da cena que foi encontrado por restore_animal_state).
 		# Apenas atualiza is_hidden e garante que o active_node aponta para este nó.
 		animals_state[animal_id]["is_hidden"] = false
 		animals_state[animal_id + "_active_node"] = animal
-		print("[BUSH REVEAL] Updated existing state for:", animal_id, "| is_hidden -> false | active_node set")
+		if DebugLogger.bush: print("[BUSH REVEAL] Updated existing state for:", animal_id, "| is_hidden -> false | active_node set")
 
 	validate_state("after_bush_reveal")
 
@@ -232,12 +234,12 @@ func save_bush_state(bush):
 		"hidden_animal_id": hidden_animal_id,
 		"is_dragged_in": is_dragged_in
 	}
-	print("[SAVE BUSH] ", bush.name, " | is_revealed:", bush.is_revealed, " | is_occupied:", bush.is_occupied, " | hidden_animal_id:", hidden_animal_id, " | is_dragged_in:", is_dragged_in)
+	if DebugLogger.bush: print("[SAVE BUSH] ", bush.name, " | is_revealed:", bush.is_revealed, " | is_occupied:", bush.is_occupied, " | hidden_animal_id:", hidden_animal_id, " | is_dragged_in:", is_dragged_in)
 
 func restore_bush_state(bush):
 	var bush_id = get_bush_unique_id(bush)
 	if not bushes_state.has(bush_id):
-		print("[RESTORE BUSH] ", bush.name, " -> sem estado salvo, conectando sinais")
+		if DebugLogger.bush: print("[RESTORE BUSH] ", bush.name, " -> sem estado salvo, conectando sinais")
 		connect_bush_signals_for(bush)
 		return
 	var state = bushes_state[bush_id]
@@ -245,7 +247,7 @@ func restore_bush_state(bush):
 		# _ready() pode ter instanciado um novo animal, mas o arbusto já estava revelado.
 		# Liberamos o animal recém-criado para não duplicar.
 		if bush.current_hidden_animal:
-			print("[RESTORE BUSH] ", bush.name, " -> revelado, descartando animal recém-instanciado:", bush.current_hidden_animal.name)
+			if DebugLogger.bush: print("[RESTORE BUSH] ", bush.name, " -> revelado, descartando animal recém-instanciado:", bush.current_hidden_animal.name)
 			bush.current_hidden_animal.queue_free()
 			bush.current_hidden_animal = null
 		bush.is_revealed = true
@@ -261,13 +263,13 @@ func restore_bush_state(bush):
 			var this_scene_index = this_segment.get_meta("scene_index", -1) if this_segment else -1
 			var saved_hidden_id = state.get("hidden_animal_id", "")
 			var saved_is_dragged_in = state.get("is_dragged_in", false)
-			print("[RESTORE BUSH] ", bush.name, " -> não revelado | animal original:", hidden_id,
+			if DebugLogger.bush: print("[RESTORE BUSH] ", bush.name, " -> n\u00e3o revelado | animal original:", hidden_id,
 				" | this_scene:", this_scene_index, " | saved_hidden_id:", saved_hidden_id)
 
 			# Verificar se o estado salvo indica que um animal DIFERENTE deveria estar aqui.
 			# Isso acontece quando o usuário retirou o nativo e arrastou outro para dentro.
 			if saved_is_dragged_in and saved_hidden_id != "" and saved_hidden_id != hidden_id:
-				print("[RESTORE BUSH] ", bush.name, " -> descartando nativo ", hidden_id,
+				if DebugLogger.bush: print("[RESTORE BUSH] ", bush.name, " -> descartando nativo ", hidden_id,
 					": estado salvo pede ", saved_hidden_id)
 				# remove_child imediato antes de queue_free para que o nome fique livre
 				# ainda neste frame — evita rename ao recriar animal com mesmo nome.
@@ -281,13 +283,13 @@ func restore_bush_state(bush):
 				if animals_state.has(active_key):
 					var the_animal = animals_state[active_key]
 					if is_instance_valid(the_animal):
-						print("[RESTORE BUSH] ", bush.name, " -> re-escondendo ", saved_hidden_id, " no lugar do nativo")
+						if DebugLogger.bush: print("[RESTORE BUSH] ", bush.name, " -> re-escondendo ", saved_hidden_id, " no lugar do nativo")
 						_rehide_animal_in_bush(bush, the_animal)
 					else:
 						animals_state.erase(active_key)
-						print("[RESTORE BUSH] ", bush.name, " -> active_node de ", saved_hidden_id, " destruído, apagado para recriação")
+						if DebugLogger.bush: print("[RESTORE BUSH] ", bush.name, " -> active_node de ", saved_hidden_id, " destru\u00eddo, apagado para recria\u00e7\u00e3o")
 				else:
-					print("[RESTORE BUSH] ", bush.name, " -> sem active_node para ", saved_hidden_id, ", será recriado por check_and_create")
+					if DebugLogger.bush: print("[RESTORE BUSH] ", bush.name, " -> sem active_node para ", saved_hidden_id, ", ser\u00e1 recriado por check_and_create")
 			elif animals_state.has(hidden_id):
 				var saved_scene_index = animals_state[hidden_id].get("scene_index", -1)
 				var saved_is_hidden = animals_state[hidden_id].get("is_hidden", false)
@@ -299,12 +301,13 @@ func restore_bush_state(bush):
 					if saved_bush_id == "" or saved_bush_id == this_bush_id:
 						# Estado pertence a este segmento E a esta moita — nativo pode reclamar o slot
 						animals_state[hidden_id + "_active_node"] = hidden_animal
-						print("[RESTORE BUSH] ", bush.name, " -> active node set for ", hidden_id, " (scene match, is_hidden:true, bush match)")
+						if DebugLogger.bush: print("[RESTORE BUSH] ", bush.name, " -> active node set for ", hidden_id, " (scene match, is_hidden:true, bush match)")
 					else:
-						# Animal está hidden mas foi arrastado para outra moita (bush_id:", saved_bush_id, ")
+						# Animal est\u00e1 hidden mas foi arrastado para outra moita (bush_id:", saved_bush_id, ")
 						# Descartar este nativo para que check_and_create_missing o recrie na moita correta
-						print("[RESTORE BUSH] ", bush.name, " -> descartando nativo ", hidden_id,
-							": is_hidden=true mas pertence à moita ", saved_bush_id, " (esta moita: ", this_bush_id, ")")
+						if DebugLogger.bush:
+							print("[RESTORE BUSH] ", bush.name, " -> descartando nativo ", hidden_id,
+								": is_hidden=true mas pertence \u00e0 moita ", saved_bush_id, " (esta moita: ", this_bush_id, ")")
 						if hidden_animal.get_parent():
 							hidden_animal.get_parent().remove_child(hidden_animal)
 						hidden_animal.queue_free()
@@ -313,7 +316,7 @@ func restore_bush_state(bush):
 				elif saved_scene_index == this_scene_index and not saved_is_hidden:
 					# Animal está LIVRE (is_hidden:false) — o bush foi revelado mas is_revealed não foi salvo corretamente.
 					# Descartar nativo e tratar bush como revelado para que check_and_create_missing restaure o animal livre.
-					print("[RESTORE BUSH] ", bush.name, " -> descartando nativo ", hidden_id,
+					if DebugLogger.bush: print("[RESTORE BUSH] ", bush.name, " -> descartando nativo ", hidden_id,
 						": estado salvo is_hidden:false (animal está livre)")
 					# remove_child imediato antes de queue_free para que o nome fique livre
 					# ainda neste frame — evita rename ao recriar animal com mesmo nome.
@@ -327,7 +330,7 @@ func restore_bush_state(bush):
 				else:
 					# Estado pertence a outro segmento: usuário arrastou o animal para outra moita.
 					# Este nativo é uma cópia obsoleta — descartá-lo para não bloquear o animal real.
-					print("[RESTORE BUSH] ", bush.name, " -> descartando nativo obsoleto ", hidden_id,
+					if DebugLogger.bush: print("[RESTORE BUSH] ", bush.name, " -> descartando nativo obsoleto ", hidden_id,
 						" (saved_scene:", saved_scene_index, " != this:", this_scene_index, ")")
 					# remove_child imediato antes de queue_free para que o nome fique livre
 					# ainda neste frame — evita rename ao recriar animal com mesmo nome.
@@ -340,7 +343,7 @@ func restore_bush_state(bush):
 			else:
 				# Nenhum estado salvo — animal nativo inédito, registrar normalmente
 				animals_state[hidden_id + "_active_node"] = hidden_animal
-				print("[RESTORE BUSH] ", bush.name, " -> active node set for ", hidden_id, " (sem estado salvo)")
+				if DebugLogger.bush: print("[RESTORE BUSH] ", bush.name, " -> active node set for ", hidden_id, " (sem estado salvo)")
 		else:
 			# Sem animal filho — verificar se havia um animal arrastado que deve ser re-escondido
 			var hidden_animal_id = state.get("hidden_animal_id", "")
@@ -351,17 +354,17 @@ func restore_bush_state(bush):
 				if animals_state.has(active_key):
 					var the_animal = animals_state[active_key]
 					if is_instance_valid(the_animal):
-						print("[RESTORE BUSH] ", bush.name, " -> re-escondendo animal arrastado:", hidden_animal_id)
+						if DebugLogger.bush: print("[RESTORE BUSH] ", bush.name, " -> re-escondendo animal arrastado:", hidden_animal_id)
 						_rehide_animal_in_bush(bush, the_animal)
 					else:
 						# Nó foi destruído com o segmento anterior.
 						# Limpar active_node → check_and_create_missing vai recriar e colocar na moita certa.
 						animals_state.erase(active_key)
-						print("[RESTORE BUSH] ", bush.name, " -> active_node destruído, apagado para recriação: ", hidden_animal_id)
+						if DebugLogger.bush: print("[RESTORE BUSH] ", bush.name, " -> active_node destruído, apagado para recriação: ", hidden_animal_id)
 				else:
-					print("[RESTORE BUSH] ", bush.name, " -> animal arrastado sem active_node:", hidden_animal_id)
+					if DebugLogger.bush: print("[RESTORE BUSH] ", bush.name, " -> animal arrastado sem active_node:", hidden_animal_id)
 			else:
-				print("[RESTORE BUSH] ", bush.name, " -> não revelado mas sem animal")
+				if DebugLogger.bush: print("[RESTORE BUSH] ", bush.name, " -> não revelado mas sem animal")
 	connect_bush_signals_for(bush)
 
 func _rehide_animal_in_bush(bush, animal):
@@ -384,9 +387,9 @@ func _rehide_animal_in_bush(bush, animal):
 		animals_state[animal_id]["is_hidden"] = true
 		animals_state[animal_id]["plane"] = animal.current_plane
 		animals_state[animal_id]["scale"] = animal.scale
-		print("[REHIDE] ", animal.name, " em ", bush.name, " | local_pos:", animal.position, " | active_node+state atualizados")
+		if DebugLogger.bush: print("[REHIDE] ", animal.name, " em ", bush.name, " | local_pos:", animal.position, " | active_node+state atualizados")
 	else:
-		print("[REHIDE] ", animal.name, " em ", bush.name, " | local_pos:", animal.position, " | active_node registrado (sem state prev)")
+		if DebugLogger.bush: print("[REHIDE] ", animal.name, " em ", bush.name, " | local_pos:", animal.position, " | active_node registrado (sem state prev)")
 
 func connect_bush_signals_for(bush):
 	reconnect_bush_signals(bush)
@@ -423,7 +426,7 @@ func save_animal_state(animal):
 	var animal_id = get_animal_unique_id(animal)
 	
 	if not animal.visible:
-		print("[SAVE] SKIPPED - hidden duplicate")
+		if DebugLogger.animal_state: print("[SAVE] SKIPPED - hidden duplicate")
 		return
 	
 	var animal_global_pos = animal.global_position
@@ -439,7 +442,7 @@ func save_animal_state(animal):
 		target_segment = current_segment
 	
 	if not target_segment:
-		print("[SAVE ERROR] No segment found for position:", animal_global_pos)
+		if DebugLogger.animal_state: print("[SAVE ERROR] No segment found for position:", animal_global_pos)
 		return
 	
 	var scene_index = target_segment.get_meta("scene_index", -1)
@@ -448,7 +451,7 @@ func save_animal_state(animal):
 	# Check if animal needs to move to a different segment physically
 	if current_segment and current_segment != target_segment:
 		var current_scene_idx = current_segment.get_meta("scene_index", -1)
-		print("[SAVE] Animal crossing from scene:", current_scene_idx, " to scene:", scene_index, " | global_pos:", animal_global_pos)
+		if DebugLogger.animal_state: print("[SAVE] Animal crossing from scene:", current_scene_idx, " to scene:", scene_index, " | global_pos:", animal_global_pos)
 		move_animal_to_segment(animal, target_segment, local_pos)
 		# Update local_pos after move
 		local_pos = animal.global_position - target_segment.global_position
@@ -466,7 +469,7 @@ func save_animal_state(animal):
 		"is_hidden": animal.is_hidden,
 		"scene_path": scene_path
 	}
-	print("[SAVE] id:", animal_id, " | scene_index:", scene_index, " | local_pos:", local_pos, " | plane:", animal.current_plane)
+	if DebugLogger.animal_state: print("[SAVE] id:", animal_id, " | scene_index:", scene_index, " | local_pos:", local_pos, " | plane:", animal.current_plane)
 
 func move_animal_to_segment(animal, target_segment: Node2D, _target_local_pos: Vector2):
 	"""Physically move animal node to a different segment"""
@@ -477,9 +480,10 @@ func move_animal_to_segment(animal, target_segment: Node2D, _target_local_pos: V
 	var target_plane = target_segment.get_node_or_null(target_plane_name)
 	
 	if not target_plane:
-		print("[MOVE ERROR] Target plane '", target_plane_name, "' not found in segment | Available children:")
-		for child in target_segment.get_children():
-			print("  - ", child.name)
+		if DebugLogger.animal_state:
+			print("[MOVE ERROR] Target plane '", target_plane_name, "' not found in segment | Available children:")
+			for child in target_segment.get_children():
+				print("  - ", child.name)
 		return
 	
 	# Store global position before moving
@@ -497,7 +501,7 @@ func move_animal_to_segment(animal, target_segment: Node2D, _target_local_pos: V
 	# Reconnect signals after reparenting
 	reconnect_animal_signals(animal)
 	
-	print("[MOVE] Animal moved to segment scene_index:", target_segment.get_meta("scene_index", -1), " | new parent:", target_plane.name, " | global_pos:", animal.global_position)
+	if DebugLogger.animal_state: print("[MOVE] Animal moved to segment scene_index:", target_segment.get_meta("scene_index", -1), " | new parent:", target_plane.name, " | global_pos:", animal.global_position)
 
 func find_segment_containing_position(global_pos: Vector2) -> Node2D:
 	"""Find which segment contains the given global position"""
@@ -528,7 +532,7 @@ func check_and_create_missing_animal(segment: Node2D):
 	for k in animals_state:
 		if not k.ends_with("_active_node") and animals_state[k] is Dictionary:
 			total_state_entries += 1
-	print("[CHECK MISSING START] scene_index:", segment_scene_index, " | total animals_state entries:", total_state_entries)
+	if DebugLogger.animal_create: print("[CHECK MISSING START] scene_index:", segment_scene_index, " | total animals_state entries:", total_state_entries)
 	# Executar validação no início de check_and_create para detectar estado
 	# corrompido que chegou aqui via restore_bush_state ou restore_animal_state.
 	validate_state("before_check_create s" + str(segment_scene_index))
@@ -555,13 +559,13 @@ func check_and_create_missing_animal(segment: Node2D):
 			for existing_animal in animals_in_segment:
 				if get_animal_unique_id(existing_animal) == animal_id:
 					already_exists = true
-					print("[CHECK MISSING] Animal ", animal_id, " already in segment (outside bush)")
+					if DebugLogger.animal_create: print("[CHECK MISSING] Animal ", animal_id, " already in segment (outside bush)")
 					var active_key = animal_id + "_active_node"
 					if animals_state.has(active_key):
 						var old_active = animals_state[active_key]
 						if is_instance_valid(old_active) and old_active != existing_animal:
 							old_active.visible = false
-							print("[CHECK MISSING] Hid duplicate instance")
+							if DebugLogger.animal_create: print("[CHECK MISSING] Hid duplicate instance")
 					animals_state[active_key] = existing_animal
 					break
 			
@@ -571,7 +575,7 @@ func check_and_create_missing_animal(segment: Node2D):
 				if animals_state.has(active_key):
 					var active_animal = animals_state[active_key]
 					if is_instance_valid(active_animal):
-						print("[CREATE MISSING] SKIP ", animal_id, " - active instance in another segment")
+						if DebugLogger.animal_create: print("[CREATE MISSING] SKIP ", animal_id, " - active instance in another segment")
 						continue
 				
 				# CRITICAL: Before creating new, check if animal is hiding inside a bush
@@ -580,12 +584,12 @@ func check_and_create_missing_animal(segment: Node2D):
 				var scene_path = state.get("scene_path", "")
 				var bush_animal = find_animal_inside_bush(segment, animal_name, scene_path)
 				if bush_animal:
-					print("[CREATE MISSING] Found ", animal_id, " hiding in bush (name:", bush_animal.name, ") - extracting instead of creating new")
+					if DebugLogger.animal_create: print("[CREATE MISSING] Found ", animal_id, " hiding in bush (name:", bush_animal.name, ") - extracting instead of creating new")
 					extract_animal_from_bush(bush_animal, segment, state)
 					continue
 				
 				# No existing instance anywhere - create it
-				print("[CREATE MISSING] scene_index:", segment_scene_index, " needs animal:", animal_id)
+				if DebugLogger.animal_create: print("[CREATE MISSING] scene_index:", segment_scene_index, " needs animal:", animal_id)
 				create_animal_in_segment(segment, animal_id, state)
 
 func find_animal_inside_bush(segment: Node2D, animal_name: String, scene_path: String = "") -> Animal:
@@ -599,9 +603,10 @@ func find_animal_inside_bush(segment: Node2D, animal_name: String, scene_path: S
 			continue
 		var name_match = (hidden_animal.name == animal_name)
 		var path_match = (scene_path != "" and hidden_animal.scene_file_path == scene_path)
-		print("[FIND IN BUSH] bush:", bush.name, " | hidden.name:", hidden_animal.name,
-			" | looking_for:", animal_name, " | name_match:", name_match,
-			" | path_match:", path_match)
+		if DebugLogger.animal_create:
+			print("[FIND IN BUSH] bush:", bush.name, " | hidden.name:", hidden_animal.name,
+				" | looking_for:", animal_name, " | name_match:", name_match,
+				" | path_match:", path_match)
 		if name_match or path_match:
 			return hidden_animal
 	return null
@@ -625,7 +630,7 @@ func extract_animal_from_bush(animal: Animal, segment: Node2D, state: Dictionary
 	var plane_name = "Plane1" if state["plane"] == "plane1" else "Plane2"
 	var target_plane = segment.get_node_or_null(plane_name)
 	if not target_plane:
-		print("[EXTRACT ERROR] Plane ", plane_name, " not found")
+		if DebugLogger.animal_create: print("[EXTRACT ERROR] Plane ", plane_name, " not found")
 		return
 	
 	# Reparent from Bush to Plane
@@ -654,7 +659,7 @@ func extract_animal_from_bush(animal: Animal, segment: Node2D, state: Dictionary
 	animals_state[animal_id + "_active_node"] = animal
 	reconnect_animal_signals(animal)
 	
-	print("[EXTRACT] Restored ", animal_id, " from bush | plane:", animal.current_plane, " | local_pos:", animal.position, " | global_pos:", animal.global_position)
+	if DebugLogger.animal_create: print("[EXTRACT] Restored ", animal_id, " from bush | plane:", animal.current_plane, " | local_pos:", animal.position, " | global_pos:", animal.global_position)
 	# Verificar gravidade após extrair da moita (animal pode estar acima da terra).
 	if animal.has_method("apply_gravity"):
 		animal.apply_gravity()
@@ -666,7 +671,7 @@ func create_animal_in_segment(segment: Node2D, animal_id: String, state: Diction
 	var animal_scene = load(scene_path)
 	
 	if not animal_scene:
-		print("[CREATE ERROR] Could not load animal scene:", scene_path)
+		if DebugLogger.animal_create: print("[CREATE ERROR] Could not load animal scene:", scene_path)
 		return
 	
 	var animal = animal_scene.instantiate()
@@ -680,7 +685,7 @@ func create_animal_in_segment(segment: Node2D, animal_id: String, state: Diction
 	var plane = segment.get_node_or_null(plane_name)
 	
 	if not plane:
-		print("[CREATE ERROR] Plane", plane_name, "not found in segment")
+		if DebugLogger.animal_create: print("[CREATE ERROR] Plane", plane_name, "not found in segment")
 		animal.queue_free()
 		return
 	
@@ -699,11 +704,11 @@ func create_animal_in_segment(segment: Node2D, animal_id: String, state: Diction
 			animals_state[animal_id + "_active_node"] = animal
 			await get_tree().process_frame
 			reconnect_animal_signals(animal)
-			print("[CREATE MISSING HIDDEN] ", animal_name, " recriado e escondido em ", target_bush_name,
+			if DebugLogger.animal_create: print("[CREATE MISSING HIDDEN] ", animal_name, " recriado e escondido em ", target_bush_name,
 				" | scene_index:", segment.get_meta("scene_index", -1))
 			return
 		else:
-			print("[CREATE MISSING HIDDEN] Bush '", target_bush_name, "' não disponível — criando visível")
+			if DebugLogger.animal_create: print("[CREATE MISSING HIDDEN] Bush '", target_bush_name, "' n\u00e3o dispon\u00edvel \u2014 criando vis\u00edvel")
 
 	# Add to plane (animal visível ou bush não disponível)
 	var name_before_add = animal.name
@@ -714,7 +719,7 @@ func create_animal_in_segment(segment: Node2D, animal_id: String, state: Diction
 	var conflicting = plane.get_node_or_null(animal_name)
 	if conflicting and conflicting != animal:
 		conflicting.name = "__freeing__"
-		print("[CREATE RENAME PREVENT] Renamed conflicting node '", animal_name,
+		if DebugLogger.animal_create: print("[CREATE RENAME PREVENT] Renamed conflicting node '", animal_name,
 			"' to '__freeing__' before adding new instance")
 	plane.add_child(animal)
 
@@ -725,8 +730,8 @@ func create_animal_in_segment(segment: Node2D, animal_id: String, state: Diction
 	# Solução: migrar o entry de animals_state para a nova chave e apagar a antiga.
 	if animal.name != name_before_add:
 		var new_id: String = "animal/" + animal.name
-		print("[CREATE RENAME FIX] ", animal_id, " renomeado para ", new_id,
-			" — migrando animals_state")
+		if DebugLogger.animal_create: print("[CREATE RENAME FIX] ", animal_id, " renomeado para ", new_id,
+			" \u2014 migrando animals_state")
 		# Migrar state dict para a nova chave
 		if animals_state.has(animal_id):
 			animals_state[new_id] = animals_state[animal_id]
@@ -751,7 +756,7 @@ func create_animal_in_segment(segment: Node2D, animal_id: String, state: Diction
 	else:
 		animal.z_index = 200
 
-	print("[CREATE MISSING] Setting plane:", animal.current_plane, " | z_index:", animal.z_index, " | is_hidden:", animal.is_hidden)
+	if DebugLogger.animal_create: print("[CREATE MISSING] Setting plane:", animal.current_plane, " | z_index:", animal.z_index, " | is_hidden:", animal.is_hidden)
 
 	# Sync visual after setting plane and z_index
 	if animal.has_method("_sync_visual_to_plane"):
@@ -768,7 +773,7 @@ func create_animal_in_segment(segment: Node2D, animal_id: String, state: Diction
 	if is_instance_valid(animal) and animal.has_method("apply_gravity") and animal.visible:
 		animal.apply_gravity()
 	
-	print("[CREATE MISSING] Created ", animal_name, " in scene_index:", segment.get_meta("scene_index", -1), " | local_pos:", animal.position, " | global_pos:", animal.global_position)
+	if DebugLogger.animal_create: print("[CREATE MISSING] Created ", animal_name, " in scene_index:", segment.get_meta("scene_index", -1), " | local_pos:", animal.position, " | global_pos:", animal.global_position)
 
 func save_animal_state_for_recycle(animal):
 	var animal_id = get_animal_unique_id(animal)
@@ -779,7 +784,7 @@ func save_animal_state_for_recycle(animal):
 	# A solução correta é purgar a entrada existente e ignorar este animal.
 	var raw_name = animal_id.trim_prefix("animal/")
 	if "@" in raw_name or raw_name.begins_with("_"):
-		print("[SAVE RECYCLE] PURGE autogenerated id:", animal_id, " | pos:", animal.position)
+		if DebugLogger.animal_state: print("[SAVE RECYCLE] PURGE autogenerated id:", animal_id, " | pos:", animal.position)
 		animals_state.erase(animal_id)
 		animals_state.erase(animal_id + "_active_node")
 		return
@@ -788,13 +793,13 @@ func save_animal_state_for_recycle(animal):
 	# pre-bush free state was already saved at drag end. Overwriting it now would
 	# corrupt it with is_hidden=true and the bush position. Preserve the free state.
 	if not animal.visible:
-		print("[SAVE RECYCLE] SKIP invisible:", animal_id, "| in_bush:", animal.has_meta("managed_by_bush"))
+		if DebugLogger.animal_state: print("[SAVE RECYCLE] SKIP invisible:", animal_id, "| in_bush:", animal.has_meta("managed_by_bush"))
 		return
 
 	# Get which scene is being recycled
 	var segment = get_segment_for_animal(animal)
 	if not segment:
-		print("[SAVE RECYCLE] SKIP no segment for:", animal_id)
+		if DebugLogger.animal_state: print("[SAVE RECYCLE] SKIP no segment for:", animal_id)
 		return
 
 	var segment_scene_index = segment.get_meta("scene_index", -1)
@@ -803,7 +808,7 @@ func save_animal_state_for_recycle(animal):
 	if animals_state.has(animal_id):
 		var saved_scene_index = animals_state[animal_id].get("scene_index", -1)
 		if saved_scene_index != segment_scene_index:
-			print("[SAVE RECYCLE] SKIP - animal belongs to scene:", saved_scene_index, "| this segment:", segment_scene_index)
+			if DebugLogger.animal_state: print("[SAVE RECYCLE] SKIP - animal belongs to scene:", saved_scene_index, "| this segment:", segment_scene_index)
 			return
 
 	# Get the animal's scene path
@@ -819,7 +824,7 @@ func save_animal_state_for_recycle(animal):
 		"is_hidden": animal.is_hidden,
 		"scene_path": scene_path
 	}
-	print("[SAVE RECYCLE] id:", animal_id, "| scene_index:", segment_scene_index, "| local_pos:", animal.position)
+	if DebugLogger.animal_state: print("[SAVE RECYCLE] id:", animal_id, "| scene_index:", segment_scene_index, "| local_pos:", animal.position)
 
 func restore_animal_state(animal):
 	var animal_id = get_animal_unique_id(animal)
@@ -838,7 +843,7 @@ func restore_animal_state(animal):
 			if animal.has_node("Area2D"):
 				animal.get_node("Area2D").set_deferred("monitoring", false)
 				animal.get_node("Area2D").set_deferred("monitorable", false)
-			print("[RESTORE] HIDING - another instance already active")
+			if DebugLogger.animal_state: print("[RESTORE] HIDING - another instance already active")
 			return false
 	
 	# No active instance yet - mark this as active
@@ -850,7 +855,7 @@ func restore_animal_state(animal):
 		# Check if this animal belongs to this segment's scene
 		var segment = get_segment_for_animal(animal)
 		if not segment:
-			print("[RESTORE ERROR] No segment found")
+			if DebugLogger.animal_state: print("[RESTORE ERROR] No segment found")
 			return false
 		
 		var this_scene_index = segment.get_meta("scene_index", -1)
@@ -866,7 +871,7 @@ func restore_animal_state(animal):
 			if animal.has_node("Area2D"):
 				animal.get_node("Area2D").set_deferred("monitoring", false)
 				animal.get_node("Area2D").set_deferred("monitorable", false)
-			print("[RESTORE] WRONG SCENE - this:", this_scene_index, "| saved:", saved_scene_index, "| HIDING | global_pos:", animal.global_position)
+			if DebugLogger.animal_state: print("[RESTORE] WRONG SCENE - this:", this_scene_index, "| saved:", saved_scene_index, "| HIDING | global_pos:", animal.global_position)
 			return false
 		
 		# Correct scene - restore animal here
@@ -874,12 +879,12 @@ func restore_animal_state(animal):
 		
 		if state.has("local_position"):
 			animal.position = state["local_position"]
-			print("[RESTORE] scene_index:", this_scene_index, "| local_pos:", state["local_position"], "| global_pos:", animal.global_position, "| MATCH!")
+			if DebugLogger.animal_state: print("[RESTORE] scene_index:", this_scene_index, "| local_pos:", state["local_position"], "| global_pos:", animal.global_position, "| MATCH!")
 		
 		animal.scale = state["scale"]
 		animal.is_hidden = state["is_hidden"]
 		animal.visible = not state["is_hidden"]
-		print("[RESTORE] Setting visible:", animal.visible, "| is_hidden:", state["is_hidden"])
+		if DebugLogger.animal_state: print("[RESTORE] Setting visible:", animal.visible, "| is_hidden:", state["is_hidden"])
 		animal.set_process(true)
 		animal.set_physics_process(true)
 		if animal.has_method("set_process_input"):
@@ -895,7 +900,7 @@ func restore_animal_state(animal):
 		
 		reconnect_animal_signals(animal)
 		
-		print("[RESTORE] id:", animal_id, "| plane:", state["plane"], "| final_global_pos:", animal.global_position, "| ACTIVE")
+		if DebugLogger.animal_state: print("[RESTORE] id:", animal_id, "| plane:", state["plane"], "| final_global_pos:", animal.global_position, "| ACTIVE")
 		# Verificar gravidade após restaurar a posição (animal pode estar acima da terra).
 		if animal.has_method("apply_gravity"):
 			animal.apply_gravity()
@@ -921,7 +926,7 @@ func restore_animal_state(animal):
 				"is_hidden": animal.is_hidden,
 				"scene_path": scene_path
 			}
-			print("[RESTORE] FIRST TIME - Saved initial state | scene_index:", scene_index, "| local_pos:", animal.position)
+			if DebugLogger.animal_state: print("[RESTORE] FIRST TIME - Saved initial state | scene_index:", scene_index, "| local_pos:", animal.position)
 			
 			# This is the correct scene for this animal
 			animal.visible = true
@@ -940,7 +945,7 @@ func restore_animal_state(animal):
 				animal.apply_gravity()
 			return true
 		else:
-			print("[RESTORE ERROR] First time but no segment found")
+			if DebugLogger.animal_state: print("[RESTORE ERROR] First time but no segment found")
 			return false
 
 func clear_active_animal(animal):
@@ -951,37 +956,33 @@ func clear_active_animal(animal):
 	# IDs autogenerated pelo Godot (@) nunca devem persistir — purgá-los diretamente.
 	var raw_name = animal_id.trim_prefix("animal/")
 	if "@" in raw_name or raw_name.begins_with("_"):
-		print("[CLEAR ACTIVE] PURGE autogenerated id:", animal_id)
+		if DebugLogger.animal_state: print("[CLEAR ACTIVE] PURGE autogenerated id:", animal_id)
 		animals_state.erase(animal_id)
 		animals_state.erase(active_key)
 		return
 
-	# Only clear active if this animal actually belongs to this segment's scene
-	if animals_state.has(animal_id):
-		var saved_scene_index = animals_state[animal_id].get("scene_index", -1)
-		var segment = get_segment_for_animal(animal)
-		if segment:
-			var segment_scene_index = segment.get_meta("scene_index", -1)
-			
-			if saved_scene_index != segment_scene_index:
-				print("[CLEAR ACTIVE] SKIP - animal belongs to scene:", saved_scene_index, "| this segment:", segment_scene_index)
-				return
-	
+	# Limpar sempre que o _active_node armazenado for ESTE animal — independente de
+	# scene_index. O nó está prestes a ser destruído; manter a referência deixaria um
+	# ponteiro inválido (freed) em animals_state, detectado pelo validador como erro.
+	# A verificação por identidade (active_animal == animal) garante que só apagamos
+	# o ponteiro quando ele realmente corresponde ao nó que será liberado.
 	if animals_state.has(active_key):
 		var active_animal = animals_state[active_key]
 		if active_animal == animal:
 			animals_state.erase(active_key)
-			print("[CLEAR ACTIVE] id:", animal_id)
+			if DebugLogger.animal_state: print("[CLEAR ACTIVE] id:", animal_id)
 		else:
 			# O _active_node aponta para um nó DIFERENTE — provavelmente o animal foi
 			# renomeado pelo Godot ao entrar na árvore, então a chave nunca correspondeu.
-			print("[CLEAR ACTIVE MISMATCH] id:", animal_id,
-				" | active_node é outro nó:", (active_animal.name if is_instance_valid(active_animal) else "DESTRUÍDO"),
-				" | este animal:", animal.name,
-				" \u2014 entrada ÓRFÃ em animals_state não será limpa!")
+			if DebugLogger.animal_state:
+				print("[CLEAR ACTIVE MISMATCH] id:", animal_id,
+					" | active_node é outro nó:", (active_animal.name if is_instance_valid(active_animal) else "DESTRUÍDO"),
+					" | este animal:", animal.name,
+					" \u2014 entrada ÓRFÃ em animals_state não será limpa!")
 	else:
-		print("[CLEAR ACTIVE NO KEY] id:", animal_id, " | active_key não existe em animals_state",
-			" \u2014 este animal nunca teve _active_node registrado com este ID (possível rename).")
+		if DebugLogger.animal_state:
+			print("[CLEAR ACTIVE NO KEY] id:", animal_id, " | active_key não existe em animals_state",
+				" \u2014 este animal nunca teve _active_node registrado com este ID (possível rename).")
 
 func find_replacement_animal(animal_id: String):
 	"""Find a visible animal to become the new active one"""
@@ -990,13 +991,13 @@ func find_replacement_animal(animal_id: String):
 	for animal in all_animals:
 		if get_animal_unique_id(animal) == animal_id and animal.visible:
 			animals_state[animal_id + "_active_node"] = animal
-			print("[REPLACEMENT] id:", animal_id, "| new active animal found")
+			if DebugLogger.animal_state: print("[REPLACEMENT] id:", animal_id, "| new active animal found")
 			return
 
 func _log_reveal_next_frame(animal, animal_id: String):
 	"""Log estado do animal 1 frame depois do reveal (após set_deferred aplicar)."""
 	if not is_instance_valid(animal):
-		print("[REVEAL +1 FRAME] ", animal_id, " -> nó destruído")
+		if DebugLogger.bush: print("[REVEAL +1 FRAME] ", animal_id, " -> nó destruído")
 		return
 	var area = animal.get_node_or_null("Area2D")
 	var parent = animal.get_parent()
@@ -1006,18 +1007,19 @@ func _log_reveal_next_frame(animal, animal_id: String):
 	var effective_z: int = animal.z_index
 	if parent and parent.z_as_relative:
 		effective_z = parent.z_index + animal.z_index
-	print("[REVEAL +1 FRAME] ", animal_id,
-		" | z_index:", animal.z_index,
-		" | effective_z_approx:", effective_z,
-		" | parent:", (parent.name if parent else "NULL"),
-		" | parent.z_index:", parent_z,
-		" | parent.z_as_relative:", parent_z_rel,
-		" | area.monitoring:", (str(area.monitoring) if area else "NO_AREA"),
-		" | area.input_pickable:", (str(area.input_pickable) if area else "NO_AREA"),
-		" | visible:", animal.visible,
-		" | is_hidden:", animal.is_hidden,
-		" | position:", animal.position,
-		" | global_pos:", animal.global_position)
+	if DebugLogger.bush:
+		print("[REVEAL +1 FRAME] ", animal_id,
+			" | z_index:", animal.z_index,
+			" | effective_z_approx:", effective_z,
+			" | parent:", (parent.name if parent else "NULL"),
+			" | parent.z_index:", parent_z,
+			" | parent.z_as_relative:", parent_z_rel,
+			" | area.monitoring:", (str(area.monitoring) if area else "NO_AREA"),
+			" | area.input_pickable:", (str(area.input_pickable) if area else "NO_AREA"),
+			" | visible:", animal.visible,
+			" | is_hidden:", animal.is_hidden,
+			" | position:", animal.position,
+			" | global_pos:", animal.global_position)
 
 func reconnect_animal_signals(animal):
 	"""Reconectar sinais de um animal (usado após reciclagem de segmento)"""
@@ -1063,47 +1065,47 @@ func _on_animal_clicked(_animal):
 	can_start_camera_drag = true
 
 func _on_animal_drag_started(animal):
-	print("[CAM] drag_started:", animal.animal_name, " | is_dragging antes:", is_dragging)
+	if DebugLogger.drag: print("[CAM] drag_started:", animal.animal_name, " | is_dragging antes:", is_dragging)
 	is_animal_being_dragged = true
 	is_dragging = false
 	mouse_pressed = false
 	can_start_camera_drag = false
 
 func _on_animal_drag_ended(animal):
-	print("[CAM] drag_ended:", animal.animal_name, " | is_animal_being_dragged permanece true por 0.15s")
+	if DebugLogger.drag: print("[CAM] drag_ended:", animal.animal_name, " | is_animal_being_dragged permanece true por 0.15s")
 	is_dragging = false
 	# Não liberar aqui — notify_bounce_finished() irá liberar após bounce (se houver)
 	# O timer de segurança garante que mesmo sem bounce, a flag é liberada
 	var timer = get_tree().create_timer(0.5)  # Aumentado para cobrir bounce (0.40s)
 	timer.timeout.connect(func(): 
 		if is_animal_being_dragged:
-			print("[CAM] drag_ended timer expirou -> is_animal_being_dragged = false")
+			if DebugLogger.drag: print("[CAM] drag_ended timer expirou -> is_animal_being_dragged = false")
 			is_animal_being_dragged = false
 	)
 
 func notify_bounce_finished(animal):
 	"""Chamado pelo animal após bounce_away_from terminar"""
-	print("[CAM] bounce_finished:", animal.animal_name, " -> is_animal_being_dragged = false")
+	if DebugLogger.drag: print("[CAM] bounce_finished:", animal.animal_name, " -> is_animal_being_dragged = false")
 	is_animal_being_dragged = false
 
 func notify_press_intercepted():
 	"""Chamado por Area2D de animal/arbusto quando captura um press.
 	Impede que o próximo Motion event inicie o drag da câmera."""
 	press_intercepted_by_area = true
-	print("[WM] press_intercepted_by_area = true")
+	if DebugLogger.input: print("[WM] press_intercepted_by_area = true")
 
 func _input(event):
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if not event.pressed:
 			if mouse_pressed or is_dragging:
-				print("[WM _input] LEFT RELEASE | mouse_pressed:", mouse_pressed, " is_dragging:", is_dragging, " -> reset")
+				if DebugLogger.input: print("[WM _input] LEFT RELEASE | mouse_pressed:", mouse_pressed, " is_dragging:", is_dragging, " -> reset")
 			mouse_pressed = false
 			is_dragging = false
 
 func _unhandled_input(event):
 	if is_animal_being_dragged:
 		if mouse_pressed or is_dragging:
-			print("[WM _unhandled] animal dragging -> reset cam state")
+			if DebugLogger.drag: print("[WM _unhandled] animal dragging -> reset cam state")
 			mouse_pressed = false
 			is_dragging = false
 		return
@@ -1113,28 +1115,28 @@ func _unhandled_input(event):
 			if event.pressed:
 				# Resetar flag de interceptação a cada novo press
 				press_intercepted_by_area = false
-				print("[WM _unhandled] LEFT PRESS -> mouse_pressed=true | press_intercepted reset")
+				if DebugLogger.input: print("[WM _unhandled] LEFT PRESS -> mouse_pressed=true | press_intercepted reset")
 				mouse_pressed = true
 				last_mouse_pos = event.position
 			else:
-				print("[WM _unhandled] LEFT RELEASE | was_dragging:", is_dragging, " -> reset")
+				if DebugLogger.input: print("[WM _unhandled] LEFT RELEASE | was_dragging:", is_dragging, " -> reset")
 				mouse_pressed = false
 				is_dragging = false
 				press_intercepted_by_area = false
 	
 	elif event is InputEventMouseMotion and mouse_pressed:
 		if is_animal_being_dragged:
-			print("[WM _unhandled] MOTION but animal dragging -> cancel cam")
+			if DebugLogger.drag: print("[WM _unhandled] MOTION but animal dragging -> cancel cam")
 			mouse_pressed = false
 			is_dragging = false
 			return
 		
 		if press_intercepted_by_area:
-			print("[WM _unhandled] MOTION blocked: area intercepted the press")
+			if DebugLogger.input: print("[WM _unhandled] MOTION blocked: area intercepted the press")
 			return
 		
 		if not is_dragging:
-			print("[WM _unhandled] MOTION -> cam drag START")
+			if DebugLogger.input: print("[WM _unhandled] MOTION -> cam drag START")
 			is_dragging = true
 		
 		var delta_x = event.position.x - last_mouse_pos.x

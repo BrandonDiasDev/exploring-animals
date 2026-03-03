@@ -22,6 +22,8 @@ config/icon="res://icon.svg"
 [autoload]
 
 WorldConfig="*res://scripts/world_config.gd"
+DebugLogger="*res://scripts/debug_log_singleton.gd"
+DebugOverlay="*res://scripts/debug_overlay.gd"
 
 [debug]
 

@@ -94,6 +94,24 @@ func run_all() -> void:
 	await _run("G7-B — sem IDs órfãos após recycle (colisão de nomes)",    _g7b_no_orphan_ids_after_recycle)
 	await _run("G7-C — validador OK após dois recycles consecutivos",      _g7c_validator_ok_after_two_recycles)
 
+	# ── Grupo 8: Accepted animal names (allowlist) ──────────────────────────────
+	await _run("G8-A — allowlist vazia aceita qualquer animal",              _g8a_allowlist_empty_accepts_any)
+	await _run("G8-B — allowlist rejeita animal com nome errado",            _g8b_allowlist_rejects_wrong_animal)
+	await _run("G8-C — allowlist aceita animal com nome correto",            _g8c_allowlist_accepts_matching_animal)
+	await _run("G8-D — validador OK após rejeição por allowlist",            _g8d_validator_ok_after_rejection)
+
+	# ── Grupo 9: hidden_animal_scene spawn inicial ───────────────────────────────
+	await _run("G9-A — animal inicial: is_hidden=true, visible=false, meta", _g9a_hidden_animal_meta_state)
+	await _run("G9-B — animal inicial: pai é o pai do arbusto",              _g9b_hidden_animal_parent)
+	await _run("G9-C — animal inicial: position igual à do arbusto",         _g9c_hidden_animal_position)
+
+	# ── Grupo 10: Holes ──────────────────────────────────────────────────────────
+	await _run("G10-A — holes usam classe Bush",                             _g10a_holes_use_bush_class)
+	await _run("G10-B — hole rejeita segundo animal (ocupado)",              _g10b_hole_double_occupation)
+
+	# ── Grupo 11: Multi-hop ciclo reveal/accept ──────────────────────────────────
+	await _run("G11-A — dois hops: bush_id coerente, sem órfãos",            _g11a_multihop_cycle)
+
 	_footer()
 
 
@@ -516,6 +534,298 @@ func _g6b_no_double_hiding() -> void:
 		"Animals escondidos em dois arbustos: %s" % str(doubles))
 
 
+# ── Grupo 8: Accepted animal names (allowlist) ──────────────────────────────
+
+# G8-A: arbusto com accepted_animal_names=[] deve aceitar qualquer animal
+func _g8a_allowlist_empty_accepts_any() -> void:
+	var test_bush := _instantiate_test_bush()
+	if not test_bush:
+		_skip_test("não foi possível instanciar arbusto de teste")
+		return
+	var dummy := _instantiate_dummy_animal()
+	if not dummy:
+		test_bush.queue_free()
+		_skip_test("não foi possível instanciar animal de teste")
+		return
+
+	var result: bool = test_bush.try_accept_animal(dummy)
+	_assert(result, "arbusto com allowlist vazia deveria aceitar qualquer animal")
+
+	# Aguardar animação de entrada antes de destruir o nó
+	await get_tree().create_timer(0.30).timeout
+	dummy.queue_free()
+	test_bush.queue_free()
+	await get_tree().process_frame
+
+
+# G8-B: arbusto com allowlist ["Capivara"] deve rejeitar animal com nome "Onça"
+func _g8b_allowlist_rejects_wrong_animal() -> void:
+	var test_bush := _instantiate_test_bush()
+	if not test_bush:
+		_skip_test("não foi possível instanciar arbusto de teste")
+		return
+	test_bush.accepted_animal_names = ["Capivara"] as Array[String]
+
+	var dummy := _instantiate_dummy_animal("Onça")
+	if not dummy:
+		test_bush.queue_free()
+		_skip_test("não foi possível instanciar animal de teste")
+		return
+
+	var result: bool = test_bush.try_accept_animal(dummy)
+	_assert(not result, "allowlist [\"Capivara\"] deveria rejeitar animal \"Onça\"")
+	_assert(not test_bush.is_occupied, "is_occupied deve ser false após rejeição por allowlist")
+
+	await get_tree().process_frame
+	dummy.queue_free()
+	test_bush.queue_free()
+	await get_tree().process_frame
+
+
+# G8-C: arbusto com allowlist ["Capivara"] deve aceitar animal com nome "Capivara"
+func _g8c_allowlist_accepts_matching_animal() -> void:
+	var test_bush := _instantiate_test_bush()
+	if not test_bush:
+		_skip_test("não foi possível instanciar arbusto de teste")
+		return
+	test_bush.accepted_animal_names = ["Capivara"] as Array[String]
+
+	var dummy := _instantiate_dummy_animal("Capivara")
+	if not dummy:
+		test_bush.queue_free()
+		_skip_test("não foi possível instanciar animal de teste")
+		return
+
+	var result: bool = test_bush.try_accept_animal(dummy)
+	_assert(result, "allowlist [\"Capivara\"] deveria aceitar animal \"Capivara\"")
+
+	await get_tree().create_timer(0.35).timeout
+	await get_tree().process_frame
+	dummy.queue_free()
+	test_bush.queue_free()
+	await get_tree().process_frame
+
+
+# G8-D: após rejeição por allowlist, validador não deve detectar corrupção de estado
+func _g8d_validator_ok_after_rejection() -> void:
+	var test_bush := _instantiate_test_bush()
+	if not test_bush:
+		_skip_test("não foi possível instanciar arbusto de teste")
+		return
+	test_bush.accepted_animal_names = ["Capivara"] as Array[String]
+
+	var dummy := _instantiate_dummy_animal("Onça")
+	if not dummy:
+		test_bush.queue_free()
+		_skip_test("não foi possível instanciar animal de teste")
+		return
+
+	# Executar rejeição (resultado descartado intencionalmente)
+	test_bush.try_accept_animal(dummy)
+	await get_tree().process_frame
+
+	var ok: bool = _validator.validate(_wm, "G8-D após rejeição allowlist")
+	_assert(ok, "invariantes violadas após rejeição por allowlist (detalhes acima)")
+
+	dummy.queue_free()
+	test_bush.queue_free()
+	await get_tree().process_frame
+
+
+# ── Grupo 9: hidden_animal_scene spawn inicial ───────────────────────────────
+
+# G9-A: animais criados por hidden_animal_scene devem estar ocultos e marcados
+func _g9a_hidden_animal_meta_state() -> void:
+	var occupied_bushes: Array = []
+	for b: Node in get_tree().get_nodes_in_group("bushes"):
+		if b.get("is_occupied"):
+			occupied_bushes.append(b)
+
+	if occupied_bushes.is_empty():
+		_skip_test("nenhum arbusto ocupado encontrado na cena")
+		return
+
+	var failures: Array[String] = []
+	for bush: Node in occupied_bushes:
+		var hidden: Node = bush.get("current_hidden_animal")
+		if not hidden or not is_instance_valid(hidden):
+			failures.append("%s: current_hidden_animal inválido" % bush.name)
+			continue
+		if not hidden.get("is_hidden"):
+			failures.append("%s: animal.is_hidden=false" % bush.name)
+		if hidden.visible:
+			failures.append("%s: animal.visible=true" % bush.name)
+		if not hidden.has_meta("managed_by_bush"):
+			failures.append("%s: meta managed_by_bush ausente" % bush.name)
+
+	_assert(failures.is_empty(),
+		"animais iniciais com estado incorreto: %s" % str(failures))
+
+
+# G9-B: animal criado por hidden_animal_scene deve ter o PAI DO ARBUSTO como pai
+func _g9b_hidden_animal_parent() -> void:
+	var occupied_bushes: Array = []
+	for b: Node in get_tree().get_nodes_in_group("bushes"):
+		if b.get("is_occupied"):
+			occupied_bushes.append(b)
+
+	if occupied_bushes.is_empty():
+		_skip_test("nenhum arbusto ocupado encontrado na cena")
+		return
+
+	var failures: Array[String] = []
+	for bush: Node in occupied_bushes:
+		var hidden: Node = bush.get("current_hidden_animal")
+		if not hidden or not is_instance_valid(hidden):
+			continue
+		var expected_parent: Node = bush.get_parent()
+		var actual_parent: Node = hidden.get_parent()
+		if actual_parent != expected_parent:
+			var exp_name: String = str(expected_parent.name) if expected_parent else "NULL"
+			var act_name: String = str(actual_parent.name) if actual_parent else "NULL"
+			failures.append("%s: esperado pai='%s', real='%s'" % [bush.name, exp_name, act_name])
+
+	_assert(failures.is_empty(),
+		"animais iniciais com pai errado: %s" % str(failures))
+
+
+# G9-C: animal criado por hidden_animal_scene deve ter a mesma position do arbusto
+func _g9c_hidden_animal_position() -> void:
+	var occupied_bushes: Array = []
+	for b: Node in get_tree().get_nodes_in_group("bushes"):
+		if b.get("is_occupied"):
+			occupied_bushes.append(b)
+
+	if occupied_bushes.is_empty():
+		_skip_test("nenhum arbusto ocupado encontrado na cena")
+		return
+
+	var EPSILON := 1.0
+	var failures: Array[String] = []
+	for bush: Node in occupied_bushes:
+		var hidden: Node = bush.get("current_hidden_animal")
+		if not hidden or not is_instance_valid(hidden):
+			continue
+		var dist: float = hidden.position.distance_to(bush.position)
+		if dist > EPSILON:
+			failures.append("%s: distância=%.2f (esperado < %.1f)" % [bush.name, dist, EPSILON])
+
+	_assert(failures.is_empty(),
+		"animais iniciais desalinhados do arbusto: %s" % str(failures))
+
+
+# ── Grupo 10: Holes ──────────────────────────────────────────────────────────
+
+# G10-A: todo nó do grupo "bushes" cujo nome contém "hole" deve usar a classe Bush
+func _g10a_holes_use_bush_class() -> void:
+	var hole_nodes: Array = []
+	for b: Node in get_tree().get_nodes_in_group("bushes"):
+		if b.name.to_lower().contains("hole"):
+			hole_nodes.append(b)
+
+	if hole_nodes.is_empty():
+		_skip_test("nenhum nó com 'hole' no nome encontrado no grupo bushes")
+		return
+
+	var wrong: Array[String] = []
+	for node: Node in hole_nodes:
+		if not node is Bush:
+			wrong.append(node.name)
+
+	_assert(wrong.is_empty(),
+		"nodes hole sem classe Bush: %s" % str(wrong))
+
+
+# G10-B: hole rejeita segundo animal quando já está ocupado
+func _g10b_hole_double_occupation() -> void:
+	var test_bush := _instantiate_test_bush()
+	if not test_bush:
+		_skip_test("não foi possível instanciar arbusto de teste (hole01.tscn)")
+		return
+
+	var dummy1 := _instantiate_dummy_animal()
+	if not dummy1:
+		test_bush.queue_free()
+		_skip_test("não foi possível instanciar primeiro animal de teste")
+		return
+
+	var result1: bool = test_bush.try_accept_animal(dummy1)
+	_assert(result1, "hole deveria aceitar o primeiro animal (slot vazio)")
+
+	# Aguardar animação para is_occupied=true ser consolidado
+	await get_tree().create_timer(0.30).timeout
+	await get_tree().process_frame
+
+	var dummy2 := _instantiate_dummy_animal()
+	if not dummy2:
+		dummy1.queue_free()
+		test_bush.queue_free()
+		_skip_test("não foi possível instanciar segundo animal de teste")
+		return
+
+	var result2: bool = test_bush.try_accept_animal(dummy2)
+	_assert(not result2, "hole deveria rejeitar segundo animal (is_occupied=true)")
+	_assert(test_bush.is_occupied, "is_occupied deve permanecer true após segunda tentativa")
+
+	await get_tree().process_frame
+	dummy1.queue_free()
+	dummy2.queue_free()
+	test_bush.queue_free()
+	await get_tree().process_frame
+
+
+# ── Grupo 11: Multi-hop ciclo reveal/accept ──────────────────────────────────
+
+# G11-A: revelar de A → aceitar em B → revelar de B → validar estado coerente
+func _g11a_multihop_cycle() -> void:
+	var bush_a := _find_occupied_unrevealed_bush()
+	if not bush_a:
+		_skip_test("nenhum arbusto ocupado disponível para o hop 1")
+		return
+
+	# Hop 1: revelar de A
+	bush_a.reveal_animal()
+	await get_tree().create_timer(0.50).timeout
+	await get_tree().process_frame
+
+	if not is_instance_valid(bush_a):
+		_skip_test("arbusto A foi destruído durante o reveal (segmento reciclado)")
+		return
+
+	var animal := _find_free_animal()
+	if not animal:
+		_skip_test("animal não estava livre após reveal de A")
+		return
+
+	var bush_b := _find_empty_unoccupied_bush_except(bush_a)
+	if not bush_b:
+		_skip_test("sem outra moita livre para o hop 2")
+		return
+
+	# Hop 2: aceitar em B
+	bush_b.try_accept_animal(animal)
+	await get_tree().create_timer(0.35).timeout
+	await get_tree().process_frame
+
+	var aid: String = _wm.get_animal_unique_id(animal)
+	var saved_bid: String = _wm.animals_state.get(aid, {}).get("bush_id", "")
+	var expected_bid: String = _wm.get_bush_unique_id(bush_b)
+	_assert(saved_bid == expected_bid,
+		"após hop 2: bush_id='%s', esperado='%s'" % [saved_bid, expected_bid])
+
+	if not is_instance_valid(bush_b):
+		_skip_test("arbusto B foi destruído antes do reveal (segmento reciclado)")
+		return
+
+	# Hop 3: revelar de B
+	bush_b.reveal_animal()
+	await get_tree().create_timer(0.50).timeout
+	await get_tree().process_frame
+
+	var ok: bool = _validator.validate(_wm, "G11-A multi-hop")
+	_assert(ok, "invariantes violadas após ciclo multi-hop (detalhes acima)")
+
+
 # ── Helpers de busca ──────────────────────────────────────────────────────────
 
 func _find_free_animal() -> Node:
@@ -547,7 +857,7 @@ func _find_empty_unoccupied_bush_except(excluded: Node) -> Node:
 	return null
 
 
-func _instantiate_dummy_animal() -> Node:
+func _instantiate_dummy_animal(animal_name_override: String = "") -> Node:
 	# Usar a primeira cena de animal conhecida como dummy
 	var path := "res://scenes/components/capivara.tscn"
 	var scene := load(path) as PackedScene
@@ -555,6 +865,21 @@ func _instantiate_dummy_animal() -> Node:
 		return null
 	var node := scene.instantiate()
 	node.name = "__test_dummy__"
+	if animal_name_override != "":
+		node.animal_name = animal_name_override
+	add_child(node)
+	return node
+
+
+func _instantiate_test_bush() -> Node:
+	# Usa hole01.tscn — tem bush.gd, accepted_animal_names=[] e sem hidden_animal_scene.
+	# Não interfere no WorldManager (não é conectado aos seus sinais).
+	var path := "res://scenes/components/hole01.tscn"
+	var scene := load(path) as PackedScene
+	if not scene:
+		return null
+	var node := scene.instantiate()
+	node.name = "__test_bush__"
 	add_child(node)
 	return node
 

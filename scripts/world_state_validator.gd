@@ -37,6 +37,7 @@ func validate(wm: Node, label: String = "", silent: bool = false) -> bool:
 	_check_double_bush_claim(wm)
 	_check_state_count_sanity(wm)
 	_check_local_pos_in_bounds(wm)
+	_check_allowlist_consistency(wm)
 
 	var prefix := "[VALIDATOR%s]" % (" <%s>" % label if label != "" else "")
 
@@ -305,3 +306,31 @@ func _check_state_count_sanity(wm: Node) -> void:
 
 	print("[VALIDATOR] Contagem: %d data entries, %d active_node entries em animals_state" \
 		% [data_count, node_count])
+
+
+# ─── Verificação 11 — allowlist consistency ──────────────────────────────────────────
+func _check_allowlist_consistency(wm: Node) -> void:
+	## Para cada arbusto ocupado com accepted_animal_names não-vazio, o animal
+	## escondido deve ter animal_name dentro dessa lista.
+	## Mismatch indica configuração incorreta na cena (bug de autoria de conteúdo),
+	## não corrupção de estado em tempo de execução — por isso é AVISO, não ERRO.
+	if not wm.get_tree():
+		return
+	var bushes: Array = wm.get_tree().get_nodes_in_group("bushes")
+	for bush: Node in bushes:
+		if not bush.get("is_occupied"):
+			continue
+		var allowlist: Array = bush.get("accepted_animal_names")
+		if allowlist == null or allowlist.size() == 0:
+			continue  # lista vazia = aceita tudo, sem verificação
+		var hidden: Node = bush.get("current_hidden_animal")
+		if not hidden or not is_instance_valid(hidden):
+			continue
+		var aname: String = hidden.get("animal_name")
+		if aname not in allowlist:
+			warnings.append(
+				"Arbusto '%s' está ocupado por '%s' (animal_name='%s') mas "
+				+ "accepted_animal_names=%s não inclui esse animal. "
+				+ "Verifique a configuração da cena."
+				% [bush.name, hidden.name, aname, str(allowlist)]
+			)

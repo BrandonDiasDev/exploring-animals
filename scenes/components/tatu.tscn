@@ -9,6 +9,8 @@ radius = 80.024994
 [node name="Tatu" type="Node2D" unique_id=471309178]
 script = ExtResource("1_ajemn")
 animal_name = "Tatu"
+is_hidden = null
+can_fly = null
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=920839805]
 texture = ExtResource("2_4iypf")

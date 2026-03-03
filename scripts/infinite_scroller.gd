@@ -35,7 +35,7 @@ func create_segment_at_offset(offset: int) -> void:
 	call_deferred("restore_segment_animals", segment)
 	
 	next_segment_index += 1
-	print("[SEGMENT CREATE] offset:", offset, "| scene_index:", scene_index, "| pos_x:", segment.position.x)
+	if DebugLogger.scroller: print("[SEGMENT CREATE] offset:", offset, "| scene_index:", scene_index, "| pos_x:", segment.position.x)
 
 func restore_segment_animals(segment):
 	await get_tree().process_frame
@@ -154,13 +154,14 @@ func recycle_segment(index: int, new_x: float) -> void:
 	# Log animals before destroying
 	var animals_before = []
 	find_animals_recursive(old_segment, animals_before)
-	print("[SEGMENT RECYCLE] Destroying scene_index:", old_scene_index, "| animals_outside_bushes:", animals_before.size())
-	for animal in animals_before:
-		print("[SEGMENT RECYCLE ANIMAL] ", animal.name,
-			" | is_falling:", animal.get("is_falling"),
-			" | is_being_dragged:", animal.get("is_being_dragged"),
-			" | visible:", animal.visible,
-			" | global_pos:", animal.global_position)
+	if DebugLogger.scroller:
+		print("[SEGMENT RECYCLE] Destroying scene_index:", old_scene_index, "| animals_outside_bushes:", animals_before.size())
+		for animal in animals_before:
+			print("[SEGMENT RECYCLE ANIMAL] ", animal.name,
+				" | is_falling:", animal.get("is_falling"),
+				" | is_being_dragged:", animal.get("is_being_dragged"),
+				" | visible:", animal.visible,
+				" | global_pos:", animal.global_position)
 	
 	# Save animal states preserving their WORLD positions
 	var world_manager = get_tree().get_first_node_in_group("world_manager")
@@ -184,9 +185,10 @@ func recycle_segment(index: int, new_x: float) -> void:
 			if world_manager and world_manager.has_method("clear_active_animal"):
 				world_manager.clear_active_animal(hidden_animal)
 			var in_bush_node = (hidden_animal.get_parent() == bush)
-			print("[SEGMENT RECYCLE] Bush ", bush.name, " hidden_animal:", hidden_animal.name,
-				" | is_child_of_bush:", in_bush_node, " | visible:", hidden_animal.visible,
-				" | managed_by_bush:", hidden_animal.has_meta("managed_by_bush"))
+			if DebugLogger.scroller:
+				print("[SEGMENT RECYCLE] Bush ", bush.name, " hidden_animal:", hidden_animal.name,
+					" | is_child_of_bush:", in_bush_node, " | visible:", hidden_animal.visible,
+					" | managed_by_bush:", hidden_animal.has_meta("managed_by_bush"))
 	
 	old_segment.queue_free()
 	
@@ -215,7 +217,7 @@ func recycle_segment(index: int, new_x: float) -> void:
 	segments[index].node = new_segment
 	segments[index].scene_index = scene_index
 
-	print("[SEGMENT RECYCLE] Created scene_index:", scene_index, "| pos_x:", new_x)
+	if DebugLogger.scroller: print("[SEGMENT RECYCLE] Created scene_index:", scene_index, "| pos_x:", new_x)
 
 	# Restaurar estado dos animais
 	call_deferred("restore_segment_animals", new_segment)

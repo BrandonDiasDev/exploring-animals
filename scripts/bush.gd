@@ -61,11 +61,11 @@ func _attach_hidden_animal(animal: Animal):
 	if bush_parent:
 		bush_parent.add_child(animal)
 		animal.position = self.position  # mesma posição do arbusto no Plane
-		print("[BUSH ATTACH] ", name, " -> '", animal.name, "' adicionado a '", bush_parent.name,
+		if DebugLogger.bush: print("[BUSH ATTACH] ", name, " -> '", animal.name, "' adicionado a '", bush_parent.name,
 			"' pos:", animal.position)
 	else:
 		add_child(animal)  # fallback: arbusto sem pai
-		print("[BUSH ATTACH] ", name, " -> fallback, animal adicionado ao próprio arbusto")
+		if DebugLogger.bush: print("[BUSH ATTACH] ", name, " -> fallback, animal adicionado ao próprio arbusto")
 	# Desabilitar monitoring agora que o nó está na árvore
 	if animal.has_node("Area2D"):
 		animal.get_node("Area2D").set_deferred("monitoring", false)
@@ -90,16 +90,18 @@ func _apply_revealed_state():
 
 func _on_area_input_event(_viewport, event: InputEvent, _shape_idx):
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		var parent_name: String = str(get_parent().name) if get_parent() else ""
 		var animal_z: String = str(current_hidden_animal.z_index) if current_hidden_animal else "(sem animal)"
 		var animal_mon = ""
 		if current_hidden_animal and current_hidden_animal.has_node("Area2D"):
 			var a = current_hidden_animal.get_node("Area2D")
 			animal_mon = " | anim.monitoring:" + str(a.monitoring) + " | anim.pickable:" + str(a.input_pickable)
-		print("[BUSH AREA INPUT] ", name,
-			" | is_revealed:", is_revealed,
-			" | is_occupied:", is_occupied,
-			" | bush.z_index:", z_index,
-			" | animal_z:", animal_z, animal_mon)
+		if DebugLogger.input:
+			print("[BUSH AREA INPUT] ", name,
+				" | is_revealed:", is_revealed,
+				" | is_occupied:", is_occupied,
+				" | bush.z_index:", z_index,
+				" | animal_z:", animal_z, animal_mon)
 
 	# Moita já revelada: ignora cliques no arbusto (animal responde sozinho)
 	if is_revealed:
@@ -119,14 +121,14 @@ func _on_area_input_event(_viewport, event: InputEvent, _shape_idx):
 			if is_occupied:
 				# Arbusto com animal: consome o evento para que APENAS o arbusto responda.
 				# O animal está oculto, nada mais precisa do press.
-				print("[BUSH] ocupado -> set_input_as_handled")
+				if DebugLogger.input: print("[BUSH] ocupado -> set_input_as_handled")
 				get_viewport().set_input_as_handled()
 			else:
 				# Arbusto VAZIO: NÃO consome o evento.
 				# O animal revelado pode estar sobreposto — ele também precisa receber o press.
 				# A câmera já foi bloqueada por notify_press_intercepted().
 				# No release, on_click() → _shake_bush() será chamado normalmente.
-				print("[BUSH] vazio -> press registrado SEM set_input_as_handled (animal pode receber também)")
+				if DebugLogger.input: print("[BUSH] vazio -> press registrado SEM set_input_as_handled (animal pode receber também)")
 
 func _input(event):
 	if not mouse_captured:
@@ -191,8 +193,9 @@ func reveal_animal():
 		target_scale = Vector2(0.6, 0.6)
 	else:
 		target_scale = Vector2(1.0, 1.0)
-	print("[BUSH REVEAL] bush:", name, " | parent:", bush_parent_name,
-		" | target_scale (from plane):", target_scale, " | animal.scale_stored:", animal.scale)
+	if DebugLogger.bush:
+		print("[BUSH REVEAL] bush:", name, " | parent:", bush_parent_name,
+			" | target_scale (from plane):", target_scale, " | animal.scale_stored:", animal.scale)
 
 	animal.is_hidden = false
 	animal.visible = true
@@ -215,7 +218,7 @@ func reveal_animal():
 		animal.current_plane = "plane2"
 	else:
 		animal.current_plane = "plane1"
-	print("[BUSH REVEAL SET PLANE] animal:", animal.name, " | current_plane:", animal.current_plane, " | scale:", animal.scale)
+	if DebugLogger.bush: print("[BUSH REVEAL SET PLANE] animal:", animal.name, " | current_plane:", animal.current_plane, " | scale:", animal.scale)
 
 	# Reabilitar o monitoring do animal via set_deferred:
 	# A reparentagem ocorre síncrona no signal handler deste mesmo frame.
@@ -226,15 +229,16 @@ func reveal_animal():
 		animal.get_node("Area2D").set_deferred("monitoring", true)
 
 	var dbg_area = animal.get_node_or_null("Area2D")
-	print("[REVEAL PRE-SIGNAL] ", animal.name,
-		" | z_index:", animal.z_index,
-		" | visible:", animal.visible,
-		" | is_hidden:", animal.is_hidden,
-		" | current_plane:", animal.current_plane,
-		" | parent:", (str(animal.get_parent().name) if animal.get_parent() else "NULL"),
-		" | area.monitoring (deferred pending, atual):", (str(dbg_area.monitoring) if dbg_area else "NO_AREA"),
-		" | area.input_pickable:", (str(dbg_area.input_pickable) if dbg_area else "NO_AREA"),
-		" | bush.z_index:", z_index)
+	if DebugLogger.bush:
+		print("[REVEAL PRE-SIGNAL] ", animal.name,
+			" | z_index:", animal.z_index,
+			" | visible:", animal.visible,
+			" | is_hidden:", animal.is_hidden,
+			" | current_plane:", animal.current_plane,
+			" | parent:", (str(animal.get_parent().name) if animal.get_parent() else "NULL"),
+			" | area.monitoring (deferred pending, atual):", (str(dbg_area.monitoring) if dbg_area else "NO_AREA"),
+			" | area.input_pickable:", (str(dbg_area.input_pickable) if dbg_area else "NO_AREA"),
+			" | bush.z_index:", z_index)
 
 	emit_signal("animal_revealed", animal)
 
@@ -244,28 +248,30 @@ func reveal_animal():
 
 	# Reabilitar área: arbusto vazio precisa detectar um novo animal solto sobre ele
 	area.set_deferred("monitoring", true)
-	print("[BUSH] reveal completo, area.monitoring = true novamente | bush.z_index:", z_index)
+	if DebugLogger.bush: print("[BUSH] reveal completo, area.monitoring = true novamente | bush.z_index:", z_index)
 
 # ─── Esconder animal arrastado ────────────────────────────────────────────────
 
 ## Chamado por animal.gd quando é solto sobre esta moita.
 ## Retorna true se aceitou, false se rejeitou.
 func try_accept_animal(dropped_animal: Animal) -> bool:
-	print("[BUSH] try_accept | bush:", name,
-		" is_occupied:", is_occupied,
-		" is_revealed:", is_revealed,
-		" animal:", dropped_animal.animal_name)
+	if DebugLogger.drag:
+		print("[BUSH] try_accept | bush:", name,
+			" is_occupied:", is_occupied,
+			" is_revealed:", is_revealed,
+			" animal:", dropped_animal.animal_name)
 	if is_occupied:
-		print("[BUSH] >> REJECT (ocupado)")
+		if DebugLogger.drag: print("[BUSH] >> REJECT (ocupado)")
 		_play_rejection(dropped_animal)
 		return false
 	# Verificar lista de animais permitidos (vazia = aceita todos)
 	if accepted_animal_names.size() > 0 and dropped_animal.animal_name not in accepted_animal_names:
-		print("[BUSH] >> REJECT (animal não permitido: ", dropped_animal.animal_name,
-			" | permitidos: ", accepted_animal_names, ")")
+		if DebugLogger.drag:
+			print("[BUSH] >> REJECT (animal não permitido: ", dropped_animal.animal_name,
+				" | permitidos: ", accepted_animal_names, ")")
 		_play_rejection(dropped_animal)
 		return false
-	print("[BUSH] >> ACCEPT")
+	if DebugLogger.drag: print("[BUSH] >> ACCEPT")
 	_accept_animal(dropped_animal)
 	return true
 
@@ -286,14 +292,14 @@ func _accept_animal(animal: Animal):
 			old_parent.remove_child(animal)
 		our_plane.add_child(animal)
 		animal.global_position = gpos
-		print("[BUSH ACCEPT REPARENT] ", animal.name, " -> ", our_plane.name, " de ", (str(our_plane.get_parent().name) if our_plane.get_parent() else "?"))
+		if DebugLogger.bush: print("[BUSH ACCEPT REPARENT] ", animal.name, " -> ", our_plane.name, " de ", (str(our_plane.get_parent().name) if our_plane.get_parent() else "?"))
 
 	# Notificar world_manager para atualizar scene_index do animal
 	emit_signal("animal_accepted_by_bush", animal, self)
 
 	# Guardar a scale alvo antes de animar
 	var original_scale = animal.scale
-	print("[BUSH ACCEPT] animal:", animal.name, " | current_plane:", animal.current_plane, " | scale_entering:", original_scale)
+	if DebugLogger.bush: print("[BUSH ACCEPT] animal:", animal.name, " | current_plane:", animal.current_plane, " | scale_entering:", original_scale)
 
 	# Desabilitar TANTO a área do animal QUANTO da moita durante a animação
 	# Evita que o release do mouse dispare on_click() e revele imediatamente
@@ -317,7 +323,7 @@ func _accept_animal(animal: Animal):
 	animal.is_hidden = true
 	animal.modulate = Color(1, 1, 1, 1)
 	animal.scale = original_scale  # Restaurar scale para quando sair
-	print("[BUSH ACCEPT DONE] animal:", animal.name, " | scale_stored:", animal.scale)
+	if DebugLogger.bush: print("[BUSH ACCEPT DONE] animal:", animal.name, " | scale_stored:", animal.scale)
 
 	# Arbusto faz animação de "engolida"
 	var gulp_tween = create_tween()
@@ -330,7 +336,7 @@ func _accept_animal(animal: Animal):
 	area.set_deferred("monitoring", true)
 
 func _play_rejection(dropped_animal: Animal):
-	print("[BUSH] _play_rejection para:", dropped_animal.animal_name)
+	if DebugLogger.drag: print("[BUSH] _play_rejection para:", dropped_animal.animal_name)
 	_shake_bush()
 	dropped_animal.bounce_away_from(global_position)
 
