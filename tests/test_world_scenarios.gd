@@ -542,6 +542,9 @@ func _g8a_allowlist_empty_accepts_any() -> void:
 	if not test_bush:
 		_skip_test("não foi possível instanciar arbusto de teste")
 		return
+	# Limpar allowlist explicitamente: o fixture (hole01.tscn) usa ["Tatu"],
+	# mas este teste valida o comportamento de allowlist VAZIA.
+	test_bush.accepted_animal_names = [] as Array[String]
 	var dummy := _instantiate_dummy_animal()
 	if not dummy:
 		test_bush.queue_free()
@@ -743,7 +746,8 @@ func _g10b_hole_double_occupation() -> void:
 		_skip_test("não foi possível instanciar arbusto de teste (hole01.tscn)")
 		return
 
-	var dummy1 := _instantiate_dummy_animal()
+	# hole01.tscn só aceita "Tatu" — usar nome correto nos dummies.
+	var dummy1 := _instantiate_dummy_animal("Tatu")
 	if not dummy1:
 		test_bush.queue_free()
 		_skip_test("não foi possível instanciar primeiro animal de teste")
@@ -756,7 +760,7 @@ func _g10b_hole_double_occupation() -> void:
 	await get_tree().create_timer(0.30).timeout
 	await get_tree().process_frame
 
-	var dummy2 := _instantiate_dummy_animal()
+	var dummy2 := _instantiate_dummy_animal("Tatu")
 	if not dummy2:
 		dummy1.queue_free()
 		test_bush.queue_free()
@@ -872,7 +876,8 @@ func _instantiate_dummy_animal(animal_name_override: String = "") -> Node:
 
 
 func _instantiate_test_bush() -> Node:
-	# Usa hole01.tscn — tem bush.gd, accepted_animal_names=[] e sem hidden_animal_scene.
+	# Usa hole01.tscn — tem bush.gd, accepted_animal_names=["Tatu"] e sem hidden_animal_scene.
+	# Para testar allowlist vazia, limpe accepted_animal_names após instanciar.
 	# Não interfere no WorldManager (não é conectado aos seus sinais).
 	var path := "res://scenes/components/hole01.tscn"
 	var scene := load(path) as PackedScene

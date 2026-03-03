@@ -255,23 +255,44 @@ func reveal_animal():
 ## Chamado por animal.gd quando é solto sobre esta moita.
 ## Retorna true se aceitou, false se rejeitou.
 func try_accept_animal(dropped_animal: Animal) -> bool:
-	if DebugLogger.drag:
-		print("[BUSH] try_accept | bush:", name,
+	var _is_hole := bush_name.begins_with("Hole") or bush_name.to_lower().contains("buraco")
+	var _tag := "[HOLE]" if _is_hole else "[BUSH]"
+
+	if _is_hole and DebugLogger.hole:
+		print(_tag, " try_accept | buraco:", name,
+			" | animal solto: '", dropped_animal.animal_name, "'",
+			" | lista permitidos: ", accepted_animal_names if accepted_animal_names.size() > 0 else ["(qualquer)"],
+			" | is_occupied:", is_occupied)
+	elif DebugLogger.drag:
+		print(_tag, " try_accept | bush:", name,
 			" is_occupied:", is_occupied,
 			" is_revealed:", is_revealed,
 			" animal:", dropped_animal.animal_name)
+
 	if is_occupied:
-		if DebugLogger.drag: print("[BUSH] >> REJECT (ocupado)")
+		if _is_hole and DebugLogger.hole:
+			print(_tag, " >> REJEITAR (buraco ocupado)")
+		elif DebugLogger.drag:
+			print(_tag, " >> REJECT (ocupado)")
 		_play_rejection(dropped_animal)
 		return false
+
 	# Verificar lista de animais permitidos (vazia = aceita todos)
 	if accepted_animal_names.size() > 0 and dropped_animal.animal_name not in accepted_animal_names:
-		if DebugLogger.drag:
-			print("[BUSH] >> REJECT (animal não permitido: ", dropped_animal.animal_name,
+		if _is_hole and DebugLogger.hole:
+			print(_tag, " >> REJEITAR — '", dropped_animal.animal_name,
+				"' NÃO está na lista | permitidos: ", accepted_animal_names)
+		elif DebugLogger.drag:
+			print(_tag, " >> REJECT (animal não permitido: ", dropped_animal.animal_name,
 				" | permitidos: ", accepted_animal_names, ")")
 		_play_rejection(dropped_animal)
 		return false
-	if DebugLogger.drag: print("[BUSH] >> ACCEPT")
+
+	if _is_hole and DebugLogger.hole:
+		print(_tag, " >> ACEITAR — '", dropped_animal.animal_name,
+			"' é compatível com a lista: ", accepted_animal_names if accepted_animal_names.size() > 0 else ["(qualquer)"])
+	elif DebugLogger.drag:
+		print(_tag, " >> ACCEPT")
 	_accept_animal(dropped_animal)
 	return true
 
