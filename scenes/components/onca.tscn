@@ -1,14 +1,14 @@
 [gd_scene format=3 uid="uid://b26y5t483lssx"]
 
 [ext_resource type="Script" uid="uid://dymxkx07niar6" path="res://scripts/animal.gd" id="1_5fk76"]
-[ext_resource type="Texture2D" uid="uid://d3vlltfax8lrw" path="res://assets/animals/onca.png" id="2_qsgin"]
+[ext_resource type="Texture2D" uid="uid://bv8s84euk32nk" path="res://assets/animals/onca.png" id="2_qsgin"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_dctrm"]
 size = Vector2(164, 271)
 
 [node name="Onca" type="Node2D" unique_id=809867871]
 script = ExtResource("1_5fk76")
-animal_name = "Animal"
+animal_name = "Onca"
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=849273167]
 texture = ExtResource("2_qsgin")

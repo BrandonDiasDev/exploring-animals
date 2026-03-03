@@ -1,0 +1,19 @@
+[gd_scene format=3 uid="uid://c56qu60hhfqpm"]
+
+[ext_resource type="Script" uid="uid://dxowuprhe2wap" path="res://scripts/bush.gd" id="1_2lc23"]
+[ext_resource type="Texture2D" uid="uid://ynlr274n6udm" path="res://assets/backgrounds/buraco.png" id="2_bj1sf"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_81lsc"]
+radius = 71.02816
+
+[node name="Hole01" type="Node2D" unique_id=70398715]
+script = ExtResource("1_2lc23")
+bush_name = "Hole01"
+
+[node name="BushSprite" type="Sprite2D" parent="." unique_id=1448243075]
+texture = ExtResource("2_bj1sf")
+
+[node name="Area2D" type="Area2D" parent="." unique_id=1108052154]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=1356412415]
+shape = SubResource("CircleShape2D_81lsc")

@@ -9,6 +9,9 @@ signal animal_accepted_by_bush(animal: Animal, bush: Bush)
 @export var is_revealed := false
 ## Cena do animal que fica escondido neste arbusto. Deixe vazio para arbusto sem animal.
 @export var hidden_animal_scene: PackedScene
+## Nomes dos animais que este esconderijo aceita receber arrastados pelo jogador.
+## Deixe vazio para aceitar qualquer animal. Ex.: ["Capivara", "Tamanduá"]
+@export var accepted_animal_names: Array[String] = []
 
 @onready var bush_sprite: Sprite2D = $BushSprite
 @onready var area: Area2D = $Area2D
@@ -253,7 +256,13 @@ func try_accept_animal(dropped_animal: Animal) -> bool:
 		" is_revealed:", is_revealed,
 		" animal:", dropped_animal.animal_name)
 	if is_occupied:
-		print("[BUSH] >> REJECT")
+		print("[BUSH] >> REJECT (ocupado)")
+		_play_rejection(dropped_animal)
+		return false
+	# Verificar lista de animais permitidos (vazia = aceita todos)
+	if accepted_animal_names.size() > 0 and dropped_animal.animal_name not in accepted_animal_names:
+		print("[BUSH] >> REJECT (animal não permitido: ", dropped_animal.animal_name,
+			" | permitidos: ", accepted_animal_names, ")")
 		_play_rejection(dropped_animal)
 		return false
 	print("[BUSH] >> ACCEPT")

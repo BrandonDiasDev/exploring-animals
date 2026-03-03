@@ -1,0 +1,12 @@
+[gd_scene format=3 uid="uid://b64y5py5trnl6"]
+
+[ext_resource type="Script" uid="uid://dxowuprhe2wap" path="res://scripts/bush.gd" id="1_d44iw"]
+
+[node name="Bush" type="Node2D" unique_id=70398715]
+script = ExtResource("1_d44iw")
+bush_name = "Hole"
+accepted_animal_names = Array[String](["Tatu"])
+
+[node name="BushSprite" type="Sprite2D" parent="." unique_id=1448243075]
+
+[node name="Area2D" type="Area2D" parent="." unique_id=1108052154]

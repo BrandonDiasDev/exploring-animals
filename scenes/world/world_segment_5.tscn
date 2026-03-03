@@ -1,6 +1,7 @@
 [gd_scene format=3 uid="uid://df5pfpm4gee2e"]
 
 [ext_resource type="Texture2D" uid="uid://b305mvfu2n4tx" path="res://assets/backgrounds/yellow-day.png" id="1_2pgyk"]
+[ext_resource type="PackedScene" uid="uid://c56qu60hhfqpm" path="res://scenes/components/hole01.tscn" id="2_y6e17"]
 
 [node name="WorldSegment" type="Node2D" unique_id=817559777]
 metadata/_edit_horizontal_guides_ = [699.0, -701.0]
@@ -15,3 +16,6 @@ z_as_relative = false
 [node name="Plane1" type="Node2D" parent="." unique_id=1453074001]
 z_index = 10
 z_as_relative = false
+
+[node name="Hole01" parent="Plane1" unique_id=70398715 instance=ExtResource("2_y6e17")]
+position = Vector2(749, 608)

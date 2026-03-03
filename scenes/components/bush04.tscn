@@ -8,6 +8,7 @@ size = Vector2(125, 474)
 
 [node name="Bush04" type="Node2D" unique_id=70398715]
 script = ExtResource("1_70mx0")
+bush_name = "Arbusto04"
 
 [node name="BushSprite" type="Sprite2D" parent="." unique_id=1448243075]
 texture = ExtResource("2_at80x")

@@ -9,7 +9,7 @@ height = 323.48264
 
 [node name="Tamandua" type="Node2D" unique_id=470758225]
 script = ExtResource("1_tdua1")
-animal_name = "Tamanduá"
+animal_name = "Tamandua"
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=542143413]
 texture = ExtResource("2_h2mal")
