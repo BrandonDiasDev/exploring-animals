@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://cqbwu75urmps8"]
 
 [ext_resource type="Script" uid="uid://dymxkx07niar6" path="res://scripts/animal.gd" id="1_brawi"]
-[ext_resource type="Texture2D" uid="uid://cgjaee4trul7l" path="res://assets/animals/capivara.png" id="2_f1wx2"]
+[ext_resource type="Texture2D" uid="uid://dmgmjks3cl2aw" path="res://assets/animals/capivara.png" id="2_f1wx2"]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_12o72"]
 radius = 39.809643

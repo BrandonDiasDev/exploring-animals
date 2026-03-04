@@ -1,17 +1,29 @@
 [gd_scene format=3 uid="uid://df5pfpm4gee2e"]
 
 [ext_resource type="Texture2D" uid="uid://b305mvfu2n4tx" path="res://assets/backgrounds/yellow-day.png" id="1_2pgyk"]
+[ext_resource type="PackedScene" uid="uid://cqhdx5be3cbc5" path="res://scenes/components/tatu.tscn" id="2_nwjd1"]
 [ext_resource type="PackedScene" uid="uid://c56qu60hhfqpm" path="res://scenes/components/hole01.tscn" id="2_y6e17"]
+[ext_resource type="Texture2D" uid="uid://2q3482polbdb" path="res://assets/backgrounds/yellow-night.png" id="night_2pgyk"]
+[ext_resource type="Script" path="res://scripts/world_segment.gd" id="seg_script"]
 
 [node name="WorldSegment" type="Node2D" unique_id=817559777]
 metadata/_edit_horizontal_guides_ = [699.0, -701.0]
+script = ExtResource("seg_script")
 
-[node name="Background" type="Sprite2D" parent="." unique_id=2099932669]
+[node name="BackgroundDay" type="Sprite2D" parent="." unique_id=2099932669]
 z_index = -10
 texture = ExtResource("1_2pgyk")
 
+[node name="BackgroundNight" type="Sprite2D" parent="." unique_id=2099932670]
+z_index = -10
+modulate = Color(1, 1, 1, 0)
+texture = ExtResource("night_2pgyk")
+
 [node name="Plane2" type="Node2D" parent="." unique_id=572081845]
 z_as_relative = false
+
+[node name="Tatu" parent="Plane2" unique_id=471309178 instance=ExtResource("2_nwjd1")]
+position = Vector2(330, -113)
 
 [node name="Plane1" type="Node2D" parent="." unique_id=1453074001]
 z_index = 10

@@ -22,6 +22,9 @@ var world_width: float = 0.0
 # Validador de invariantes — instanciado sob demanda, apenas em debug builds
 var _validator = null
 
+# Referência ao ClipOverlay para acionar a transição dia/noite
+var _clip_overlay = null
+
 func _ready():
 	add_to_group("world_manager")
 	
@@ -37,6 +40,12 @@ func _ready():
 	
 	connect_animal_signals()
 	connect_bush_signals()
+
+	# Conecta o sinal de transição dia/noite emitido pelo SunMoon.
+	var sun_moon := get_node_or_null("Sky/SunMoon")
+	if sun_moon and sun_moon.has_signal("day_night_transition_started"):
+		sun_moon.day_night_transition_started.connect(self._on_day_night_transition_started)
+	_clip_overlay = get_node_or_null("ClipOverlay")
 
 func connect_animal_signals():
 	await get_tree().process_frame
@@ -71,6 +80,18 @@ func reconnect_bush_signals(bush):
 		if bush.animal_accepted_by_bush.is_connected(_on_bush_accepted_animal):
 			bush.animal_accepted_by_bush.disconnect(_on_bush_accepted_animal)
 		bush.animal_accepted_by_bush.connect(_on_bush_accepted_animal)
+
+## Chamado quando SunMoon inicia a transição dia↔noite.
+## Propaga a transição para todos os segmentos ativos e para o overlay de clip.
+func _on_day_night_transition_started(to_day: bool, duration: float) -> void:
+	# Transiciona o background de cada segmento visível
+	for seg_data in infinite_scroller.segments:
+		var seg = seg_data.get("node")
+		if is_instance_valid(seg) and seg.has_method("apply_day_night"):
+			seg.apply_day_night(to_day, true, duration)
+	# Transiciona a cor do overlay (topo/baixo da tela)
+	if is_instance_valid(_clip_overlay) and _clip_overlay.has_method("transition_day_night"):
+		_clip_overlay.transition_day_night(to_day, duration)
 
 func _on_bush_accepted_animal(animal: Animal, bush: Bush):
 	"""Atualiza scene_index, local_position, bush_id e is_hidden do animal.

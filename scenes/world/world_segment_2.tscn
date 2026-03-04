@@ -5,12 +5,19 @@
 [ext_resource type="PackedScene" uid="uid://b26y5t483lssx" path="res://scenes/components/onca.tscn" id="3_e1dsy"]
 [ext_resource type="PackedScene" uid="uid://wmaxxj2rmo7u" path="res://scenes/components/bush03.tscn" id="4_8wsw7"]
 [ext_resource type="PackedScene" uid="uid://brjgm5r7cqny8" path="res://scenes/components/tamandua.tscn" id="5_5p0bt"]
+[ext_resource type="Texture2D" uid="uid://jq78aysov5g2" path="res://assets/backgrounds/blue-night.png" id="night_6si38"]
+[ext_resource type="Script" path="res://scripts/world_segment.gd" id="seg_script"]
 
 [node name="WorldSegment" type="Node2D" unique_id=1767376223]
 metadata/_edit_horizontal_guides_ = [700.0, -701.0]
+script = ExtResource("seg_script")
 
-[node name="Background" type="Sprite2D" parent="." unique_id=959871696]
+[node name="BackgroundDay" type="Sprite2D" parent="." unique_id=959871696]
 texture = ExtResource("1_6si38")
+
+[node name="BackgroundNight" type="Sprite2D" parent="." unique_id=959871697]
+modulate = Color(1, 1, 1, 0)
+texture = ExtResource("night_6si38")
 
 [node name="Plane2" type="Node2D" parent="." unique_id=1999616768]
 

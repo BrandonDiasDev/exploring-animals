@@ -36,6 +36,14 @@ const SET_OFFSET_Y := 90.0
 const EASE_OUT_CURVE := Tween.EASE_IN
 const EASE_IN_CURVE  := Tween.EASE_OUT
 
+## Duração da transição de fundo (backgrounds dos segmentos do mundo).
+const BG_TRANSITION_DURATION := 4.5
+
+# ── Sinal ─────────────────────────────────────────────────────────────────────
+## Disparado no início da transição dia↔noite.
+## `duration` indica em segundos quanto tempo o background deve levar.
+signal day_night_transition_started(to_day: bool, duration: float)
+
 # ── Nós criados em código ─────────────────────────────────────────────────────
 var _sun:  TextureRect
 var _moon: TextureRect
@@ -82,14 +90,14 @@ func _process(_delta: float) -> void:
 
 # ─────────────────────────────────────────────────────────────────────────────
 func _make_icon(path: String, node_name: String) -> TextureRect:
-	var tr          := TextureRect.new()
-	tr.name         = node_name
-	tr.texture      = load(path)
-	tr.size         = ICON_SIZE
-	tr.stretch_mode = TextureRect.STRETCH_SCALE
-	tr.mouse_filter = Control.MOUSE_FILTER_STOP
-	tr.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	return tr
+	var rect          := TextureRect.new()
+	rect.name         = node_name
+	rect.texture      = load(path)
+	rect.size         = ICON_SIZE
+	rect.stretch_mode = TextureRect.STRETCH_SCALE
+	rect.mouse_filter = Control.MOUSE_FILTER_STOP
+	rect.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	return rect
 
 # ─────────────────────────────────────────────────────────────────────────────
 ## Calcula a posição-alvo do ícone em coordenadas de tela.
@@ -147,6 +155,14 @@ func _on_moon_input(event: InputEvent) -> void:
 ## `to_day = false` → sol se põe, lua nasce.
 func _animate_transition(to_day: bool) -> void:
 	_animating = true
+
+	# Atualiza o estado global ANTES de qualquer animação — segmentos reciclados
+	# durante a transição já nascerão com o estado correto (snap instantâneo).
+	var cfg := get_node_or_null("/root/WorldConfig")
+	if cfg:
+		cfg.is_day = to_day
+	day_night_transition_started.emit(to_day, BG_TRANSITION_DURATION)
+
 
 	var leaving  : TextureRect = _sun  if not to_day else _moon
 	var arriving : TextureRect = _moon if not to_day else _sun

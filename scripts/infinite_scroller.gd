@@ -74,6 +74,13 @@ func restore_segment_animals(segment):
 	if world_manager.has_method("check_and_create_missing_animal"):
 		world_manager.check_and_create_missing_animal(segment)
 
+	# Snap imediato do background para o estado dia/noite atual.
+	# Garante que segmentos reciclados durante uma transição não mostrem
+	# o estado anterior por um frame sequer.
+	if is_instance_valid(segment) and segment.has_method("apply_day_night"):
+		var cfg := get_node_or_null("/root/WorldConfig")
+		segment.apply_day_night(cfg.is_day if cfg else true, false, 0.0)
+
 func find_animals_recursive(node, animals_array):
 	if not is_instance_valid(node):
 		return

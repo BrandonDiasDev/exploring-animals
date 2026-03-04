@@ -90,7 +90,7 @@ func _apply_revealed_state():
 
 func _on_area_input_event(_viewport, event: InputEvent, _shape_idx):
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-		var parent_name: String = str(get_parent().name) if get_parent() else ""
+		var _parent_name: String = str(get_parent().name) if get_parent() else ""
 		var animal_z: String = str(current_hidden_animal.z_index) if current_hidden_animal else "(sem animal)"
 		var animal_mon = ""
 		if current_hidden_animal and current_hidden_animal.has_node("Area2D"):

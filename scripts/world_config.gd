@@ -71,3 +71,10 @@ extends Node
 ## Cor dos painéis que cobrem as áreas acima/abaixo do mundo.
 ## Deve combinar com a cor de fundo da janela do projeto.
 @export var clip_overlay_color: Color = Color(0.114, 0.114, 0.114, 1.0)
+## Cor dos painéis durante a noite (interpola a partir de clip_overlay_color).
+@export var clip_overlay_night_color: Color = Color(0.04, 0.04, 0.07, 1.0)
+
+# ── Estado global dia/noite ───────────────────────────────────────────────────
+## `true` enquanto for dia; `false` enquanto for noite.
+## Atualizado por sun_moon.gd no início de cada transição.
+var is_day: bool = true
