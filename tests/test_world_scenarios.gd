@@ -112,6 +112,21 @@ func run_all() -> void:
 	# ── Grupo 11: Multi-hop ciclo reveal/accept ──────────────────────────────────
 	await _run("G11-A — dois hops: bush_id coerente, sem órfãos",            _g11a_multihop_cycle)
 
+	# ── Grupo 12: Transição Dia/Noite ─────────────────────────────────────────────
+	await _run("G12-A — WorldConfig.is_day field existe",                    _g12a_world_config_is_day_field)
+	await _run("G12-B — WorldConfig.clip_overlay_night_color field existe",  _g12b_world_config_night_color_field)
+	await _run("G12-C — segment snap para dia: BackgroundNight.alpha=0.0",   _g12c_segment_snap_to_day)
+	await _run("G12-D — segment snap para noite: BackgroundNight.alpha=1.0", _g12d_segment_snap_to_night)
+	await _run("G12-E — segmentos têm BackgroundDay e BackgroundNight",       _g12e_segments_have_background_nodes)
+	await _run("G12-F — alpha coerente com WorldConfig.is_day no estado atual", _g12f_segments_alpha_coherent)
+	await _run("G12-G — recycle snapa para noite (is_day=false)",             _g12g_recycle_snap_to_night)
+	await _run("G12-H — recycle snapa para dia (is_day=true)",                _g12h_recycle_snap_to_day)
+	await _run("G12-I — ClipOverlay transiciona em direção à cor noite",      _g12i_clip_overlay_to_night)
+	await _run("G12-J — ClipOverlay transiciona em direção à cor dia",        _g12j_clip_overlay_to_day)
+	await _run("G12-K — WorldManager propaga snap noite para segmentos",      _g12k_wm_propagates_night)
+	await _run("G12-L — WorldManager propaga snap dia para segmentos",        _g12l_wm_propagates_day)
+	await _run("G12-M — SunMoon emite sinal com parâmetros corretos",         _g12m_sun_moon_emits_signal)
+
 	_footer()
 
 
@@ -830,6 +845,400 @@ func _g11a_multihop_cycle() -> void:
 	_assert(ok, "invariantes violadas após ciclo multi-hop (detalhes acima)")
 
 
+# ── Grupo 12: Transição Dia/Noite ─────────────────────────────────────────────
+
+# G12-A: WorldConfig deve expor a propriedade is_day
+func _g12a_world_config_is_day_field() -> void:
+	var cfg := get_node_or_null("/root/WorldConfig")
+	if not cfg:
+		_skip_test("WorldConfig não disponível")
+		return
+	_assert(cfg.get("is_day") != null,
+		"WorldConfig não tem campo 'is_day'")
+
+
+# G12-B: WorldConfig deve expor a propriedade clip_overlay_night_color
+func _g12b_world_config_night_color_field() -> void:
+	var cfg := get_node_or_null("/root/WorldConfig")
+	if not cfg:
+		_skip_test("WorldConfig não disponível")
+		return
+	_assert(cfg.get("clip_overlay_night_color") != null,
+		"WorldConfig não tem campo 'clip_overlay_night_color'")
+
+
+# G12-C: apply_day_night(true, false) — snap imediato para dia, alpha deve ser 0.0
+func _g12c_segment_snap_to_day() -> void:
+	var scroller = _wm.get("infinite_scroller")
+	if not scroller or scroller.segments.is_empty():
+		_skip_test("nenhum segmento ativo")
+		return
+	var seg = scroller.segments[0].get("node")
+	if not is_instance_valid(seg) or not seg.has_method("apply_day_night"):
+		_skip_test("segmento não tem apply_day_night")
+		return
+	var bg_night = seg.get_node_or_null("BackgroundNight")
+	if not bg_night:
+		_skip_test("BackgroundNight não encontrado no segmento")
+		return
+	# Salvar estado original e aplicar snap para dia
+	var orig_alpha: float = bg_night.modulate.a
+	seg.apply_day_night(true, false, 0.0)
+	var result_ok := is_equal_approx(bg_night.modulate.a, 0.0)
+	# Restaurar
+	bg_night.modulate.a = orig_alpha
+	_assert(result_ok,
+		"BackgroundNight.modulate.a=%.3f (esperado 0.0)" % bg_night.modulate.a)
+
+
+# G12-D: apply_day_night(false, false) — snap imediato para noite, alpha deve ser 1.0
+func _g12d_segment_snap_to_night() -> void:
+	var scroller = _wm.get("infinite_scroller")
+	if not scroller or scroller.segments.is_empty():
+		_skip_test("nenhum segmento ativo")
+		return
+	var seg = scroller.segments[0].get("node")
+	if not is_instance_valid(seg) or not seg.has_method("apply_day_night"):
+		_skip_test("segmento não tem apply_day_night")
+		return
+	var bg_night = seg.get_node_or_null("BackgroundNight")
+	if not bg_night:
+		_skip_test("BackgroundNight não encontrado no segmento")
+		return
+	var orig_alpha: float = bg_night.modulate.a
+	seg.apply_day_night(false, false, 0.0)
+	var result_ok := is_equal_approx(bg_night.modulate.a, 1.0)
+	# Restaurar
+	seg.apply_day_night(true, false, 0.0)
+	bg_night.modulate.a = orig_alpha
+	_assert(result_ok,
+		"BackgroundNight.modulate.a=%.3f (esperado 1.0)" % bg_night.modulate.a)
+
+
+# G12-E: todos os segmentos ativos devem ter os filhos BackgroundDay e BackgroundNight
+func _g12e_segments_have_background_nodes() -> void:
+	var scroller = _wm.get("infinite_scroller")
+	if not scroller or scroller.segments.is_empty():
+		_skip_test("nenhum segmento ativo")
+		return
+	var missing: Array[String] = []
+	for seg_data in scroller.segments:
+		var seg = seg_data.get("node")
+		if not is_instance_valid(seg):
+			continue
+		if not seg.get_node_or_null("BackgroundDay"):
+			missing.append("%s: sem BackgroundDay" % seg.name)
+		if not seg.get_node_or_null("BackgroundNight"):
+			missing.append("%s: sem BackgroundNight" % seg.name)
+	_assert(missing.is_empty(),
+		"segmentos sem nós de background: %s" % str(missing))
+
+
+# G12-F: alpha de BackgroundNight em cada segmento deve bater com WorldConfig.is_day
+# Aplica snap em todos antes de medir — elimina qualquer tween em voo.
+func _g12f_segments_alpha_coherent() -> void:
+	var cfg := get_node_or_null("/root/WorldConfig")
+	var scroller = _wm.get("infinite_scroller")
+	if not cfg or not scroller or scroller.segments.is_empty():
+		_skip_test("WorldConfig ou scroller não disponíveis")
+		return
+	var is_day: bool = cfg.is_day
+	var expected_alpha := 0.0 if is_day else 1.0
+	# Forçar snap em todos para garantir estado limpo
+	for seg_data in scroller.segments:
+		var seg = seg_data.get("node")
+		if is_instance_valid(seg) and seg.has_method("apply_day_night"):
+			seg.apply_day_night(is_day, false, 0.0)
+	var mismatched: Array[String] = []
+	for seg_data in scroller.segments:
+		var seg = seg_data.get("node")
+		if not is_instance_valid(seg):
+			continue
+		var bg_night = seg.get_node_or_null("BackgroundNight")
+		if not bg_night:
+			continue
+		if not is_equal_approx(bg_night.modulate.a, expected_alpha):
+			mismatched.append("%s: alpha=%.3f (esperado %.1f)" % [seg.name, bg_night.modulate.a, expected_alpha])
+	_assert(mismatched.is_empty(),
+		"alpha inconsistente com is_day=%s: %s" % [str(is_day), str(mismatched)])
+
+
+# G12-G: segmento reciclado com WorldConfig.is_day=false deve ter BackgroundNight.alpha=1.0
+func _g12g_recycle_snap_to_night() -> void:
+	var scroller = _wm.get("infinite_scroller")
+	var cfg := get_node_or_null("/root/WorldConfig")
+	if not scroller or not cfg:
+		_skip_test("scroller ou WorldConfig não disponíveis")
+		return
+	if scroller.segments.size() < 2:
+		_skip_test("menos de 2 segmentos ativos")
+		return
+	var orig_is_day: bool = cfg.is_day
+	cfg.is_day = false
+	var rightmost_x: float = scroller.get_rightmost_segment_x()
+	scroller.recycle_segment(0, rightmost_x + scroller.world_width)
+	await get_tree().create_timer(0.35).timeout
+	await get_tree().process_frame
+	# O slot 0 agora contém o segmento recém-criado
+	var new_seg = scroller.segments[0].get("node")
+	var passed := false
+	var detail := "segmento reciclado inválido"
+	if is_instance_valid(new_seg):
+		var bg_night = new_seg.get_node_or_null("BackgroundNight")
+		if bg_night:
+			passed = is_equal_approx(bg_night.modulate.a, 1.0)
+			detail = "BackgroundNight.alpha=%.3f (esperado 1.0)" % bg_night.modulate.a
+		else:
+			detail = "BackgroundNight não encontrado no segmento reciclado"
+	# Restaurar estado global
+	cfg.is_day = orig_is_day
+	for seg_data in scroller.segments:
+		var seg = seg_data.get("node")
+		if is_instance_valid(seg) and seg.has_method("apply_day_night"):
+			seg.apply_day_night(orig_is_day, false, 0.0)
+	_assert(passed, detail)
+
+
+# G12-H: segmento reciclado com WorldConfig.is_day=true deve ter BackgroundNight.alpha=0.0
+func _g12h_recycle_snap_to_day() -> void:
+	var scroller = _wm.get("infinite_scroller")
+	var cfg := get_node_or_null("/root/WorldConfig")
+	if not scroller or not cfg:
+		_skip_test("scroller ou WorldConfig não disponíveis")
+		return
+	if scroller.segments.size() < 2:
+		_skip_test("menos de 2 segmentos ativos")
+		return
+	var orig_is_day: bool = cfg.is_day
+	cfg.is_day = true
+	var rightmost_x: float = scroller.get_rightmost_segment_x()
+	scroller.recycle_segment(0, rightmost_x + scroller.world_width)
+	await get_tree().create_timer(0.35).timeout
+	await get_tree().process_frame
+	var new_seg = scroller.segments[0].get("node")
+	var passed := false
+	var detail := "segmento reciclado inválido"
+	if is_instance_valid(new_seg):
+		var bg_night = new_seg.get_node_or_null("BackgroundNight")
+		if bg_night:
+			passed = is_equal_approx(bg_night.modulate.a, 0.0)
+			detail = "BackgroundNight.alpha=%.3f (esperado 0.0)" % bg_night.modulate.a
+		else:
+			detail = "BackgroundNight não encontrado no segmento reciclado"
+	# Restaurar estado global
+	cfg.is_day = orig_is_day
+	for seg_data in scroller.segments:
+		var seg = seg_data.get("node")
+		if is_instance_valid(seg) and seg.has_method("apply_day_night"):
+			seg.apply_day_night(orig_is_day, false, 0.0)
+	_assert(passed, detail)
+
+
+# G12-I: ClipOverlay.transition_day_night(false) deve mover _current_color em direção a night color
+func _g12i_clip_overlay_to_night() -> void:
+	var clip = _wm.get("_clip_overlay") if _wm else null
+	var cfg  := get_node_or_null("/root/WorldConfig")
+	if not clip or not cfg:
+		_skip_test("ClipOverlay ou WorldConfig não disponíveis")
+		return
+	if not clip.has_method("transition_day_night"):
+		_skip_test("ClipOverlay sem método transition_day_night")
+		return
+	var day_color:   Color = cfg.clip_overlay_color
+	var night_color: Color = cfg.clip_overlay_night_color
+	var total_dist   := _color_distance(day_color, night_color)
+	if total_dist < 0.001:
+		_skip_test("clip_overlay_color e clip_overlay_night_color são idênticos — teste sem sentido")
+		return
+	# Snap para dia e iniciar transição para noite com duração curta
+	clip.set("_current_color", day_color)
+	await get_tree().process_frame
+	clip.transition_day_night(false, 0.15)
+	await get_tree().create_timer(0.20).timeout
+	await get_tree().process_frame
+	var current: Color = clip.get("_current_color")
+	# A cor atual deve ter se afastado do day_color em direção ao night_color
+	var remaining_dist := _color_distance(current, night_color)
+	var moved_past_midpoint := remaining_dist < total_dist * 0.5
+	# Restaurar cor de dia
+	clip.set("_current_color", day_color)
+	_assert(moved_past_midpoint,
+		"_current_color não cruzou o ponto médio em direção a night_color (remaining=%.4f, total=%.4f)" % [remaining_dist, total_dist])
+
+
+# G12-J: ClipOverlay.transition_day_night(true) deve mover _current_color em direção a day color
+func _g12j_clip_overlay_to_day() -> void:
+	var clip = _wm.get("_clip_overlay") if _wm else null
+	var cfg  := get_node_or_null("/root/WorldConfig")
+	if not clip or not cfg:
+		_skip_test("ClipOverlay ou WorldConfig não disponíveis")
+		return
+	if not clip.has_method("transition_day_night"):
+		_skip_test("ClipOverlay sem método transition_day_night")
+		return
+	var day_color:   Color = cfg.clip_overlay_color
+	var night_color: Color = cfg.clip_overlay_night_color
+	var total_dist   := _color_distance(day_color, night_color)
+	if total_dist < 0.001:
+		_skip_test("clip_overlay_color e clip_overlay_night_color são idênticos — teste sem sentido")
+		return
+	# Snap para noite e iniciar transição para dia com duração curta
+	clip.set("_current_color", night_color)
+	await get_tree().process_frame
+	clip.transition_day_night(true, 0.15)
+	await get_tree().create_timer(0.20).timeout
+	await get_tree().process_frame
+	var current: Color = clip.get("_current_color")
+	var remaining_dist := _color_distance(current, day_color)
+	var moved_past_midpoint := remaining_dist < total_dist * 0.5
+	# Restaurar cor de dia
+	clip.set("_current_color", day_color)
+	_assert(moved_past_midpoint,
+		"_current_color não cruzou o ponto médio em direção a day_color (remaining=%.4f, total=%.4f)" % [remaining_dist, total_dist])
+
+
+# G12-K: _on_day_night_transition_started(false, 0.0) deve fazer snap de todos os segmentos para noite
+func _g12k_wm_propagates_night() -> void:
+	var scroller = _wm.get("infinite_scroller")
+	if not scroller or scroller.segments.is_empty():
+		_skip_test("nenhum segmento ativo")
+		return
+	if not _wm.has_method("_on_day_night_transition_started"):
+		_skip_test("WorldManager sem _on_day_night_transition_started")
+		return
+	# Salvar alphas originais
+	var orig_alphas: Dictionary = {}
+	for seg_data in scroller.segments:
+		var seg = seg_data.get("node")
+		if is_instance_valid(seg):
+			var bg = seg.get_node_or_null("BackgroundNight")
+			if bg:
+				orig_alphas[seg.get_instance_id()] = bg.modulate.a
+	# Chamar com duration=0.0 → snap imediato para noite
+	_wm._on_day_night_transition_started(false, 0.0)
+	await get_tree().process_frame
+	var mismatched: Array[String] = []
+	for seg_data in scroller.segments:
+		var seg = seg_data.get("node")
+		if not is_instance_valid(seg):
+			continue
+		var bg = seg.get_node_or_null("BackgroundNight")
+		if not bg:
+			continue
+		if not is_equal_approx(bg.modulate.a, 1.0):
+			mismatched.append("%s: alpha=%.3f" % [seg.name, bg.modulate.a])
+	# Restaurar estado original
+	var restore_cfg := get_node_or_null("/root/WorldConfig")
+	var restore_is_day: bool = restore_cfg.is_day if restore_cfg else true
+	for seg_data in scroller.segments:
+		var seg = seg_data.get("node")
+		if is_instance_valid(seg) and seg.has_method("apply_day_night"):
+			seg.apply_day_night(restore_is_day, false, 0.0)
+	_assert(mismatched.is_empty(),
+		"segmentos não fizeram snap para noite via _on_day_night_transition_started: %s" % str(mismatched))
+
+
+# G12-L: ciclo noite→dia via _on_day_night_transition_started deve restaurar alpha=0.0
+func _g12l_wm_propagates_day() -> void:
+	var scroller = _wm.get("infinite_scroller")
+	if not scroller or scroller.segments.is_empty():
+		_skip_test("nenhum segmento ativo")
+		return
+	if not _wm.has_method("_on_day_night_transition_started"):
+		_skip_test("WorldManager sem _on_day_night_transition_started")
+		return
+	# Forçar noite com snap e depois reverter para dia
+	_wm._on_day_night_transition_started(false, 0.0)
+	await get_tree().process_frame
+	_wm._on_day_night_transition_started(true, 0.0)
+	await get_tree().process_frame
+	var mismatched: Array[String] = []
+	for seg_data in scroller.segments:
+		var seg = seg_data.get("node")
+		if not is_instance_valid(seg):
+			continue
+		var bg = seg.get_node_or_null("BackgroundNight")
+		if not bg:
+			continue
+		if not is_equal_approx(bg.modulate.a, 0.0):
+			mismatched.append("%s: alpha=%.3f" % [seg.name, bg.modulate.a])
+	_assert(mismatched.is_empty(),
+		"segmentos não fizeram snap de volta para dia: %s" % str(mismatched))
+
+
+# G12-M: SunMoon deve emitir day_night_transition_started com to_day e BG_TRANSITION_DURATION corretos.
+# Chama _animate_transition diretamente e captura o sinal com CONNECT_ONE_SHOT.
+# Aguarda a animação completa (~1.5s) e restaura visualmente o estado original.
+func _g12m_sun_moon_emits_signal() -> void:
+	var sun_moon := _wm.get_node_or_null("Sky/SunMoon") if _wm else null
+	if not sun_moon:
+		_skip_test("SunMoon não encontrado em Sky/SunMoon")
+		return
+	if not sun_moon.has_signal("day_night_transition_started"):
+		_skip_test("SunMoon sem sinal day_night_transition_started")
+		return
+	if sun_moon.get("_animating"):
+		_skip_test("SunMoon já está animando — aguardar antes de testar")
+		return
+	var cfg := get_node_or_null("/root/WorldConfig")
+	var orig_is_day: bool = cfg.is_day if cfg else true
+	# Garantir que o SunMoon esteja em estado de dia para disparar dia→noite
+	sun_moon.set("_is_day", true)
+	if cfg:
+		cfg.is_day = true
+	# Instalar spy de sinal (one-shot)
+	# Usa um Array como container mutável — lambdas GDScript capturam por valor,
+	# então reatribuir variáveis locais dentro da lambda não afeta o escopo externo.
+	var capture := [false, null, null]  # [captured, to_day, duration]
+	var capture_fn := func(to_day, duration):
+		capture[0] = true
+		capture[1] = to_day
+		capture[2] = duration
+	sun_moon.day_night_transition_started.connect(capture_fn, CONNECT_ONE_SHOT)
+	# Disparar transição dia→noite
+	sun_moon.call("_animate_transition", false)
+	# O sinal é emitido de forma síncrona antes do primeiro await — aguardar 1 frame para confirmar.
+	await get_tree().process_frame
+	# Aguardar a animação dos ícones (ANIM_DURATION * 2 = ~1.3s)
+	await get_tree().create_timer(1.5).timeout
+	# Restaurar estado visual: forçar de volta ao estado original sem animação
+	var sun_icon  = sun_moon.get("_sun")
+	var moon_icon = sun_moon.get("_moon")
+	if sun_icon and moon_icon:
+		sun_icon.visible    = orig_is_day
+		sun_icon.modulate.a = 1.0
+		moon_icon.visible    = not orig_is_day
+		moon_icon.modulate.a = 1.0
+	sun_moon.set("_is_day", orig_is_day)
+	sun_moon.set("_animating", false)
+	if cfg:
+		cfg.is_day = orig_is_day
+	# Restaurar todos os segmentos — matar tweens de background e fazer snap para o estado original.
+	var scroller = _wm.get("infinite_scroller") if _wm else null
+	if scroller:
+		for seg_data in scroller.segments:
+			var seg = seg_data.get("node")
+			if is_instance_valid(seg) and seg.has_method("apply_day_night"):
+				seg.apply_day_night(orig_is_day, false, 0.0)
+	# Restaurar cor do overlay — matar o tween de 4.5s que o sinal disparou, depois fazer snap.
+	var clip = _wm.get("_clip_overlay") if _wm else null
+	if clip and cfg:
+		var active_tween = clip.get("_tween")
+		if active_tween:
+			active_tween.kill()
+			clip.set("_tween", null)
+		clip.set("_current_color", cfg.clip_overlay_color if orig_is_day else cfg.clip_overlay_night_color)
+	# Verificações
+	_assert(capture[0],
+		"sinal day_night_transition_started não foi emitido")
+	if capture[0]:
+		_assert(capture[1] == false,
+			"to_day=%s (esperado false)" % str(capture[1]))
+		var expected_dur: float = sun_moon.get("BG_TRANSITION_DURATION") if sun_moon.get("BG_TRANSITION_DURATION") else 4.5
+		_assert(is_equal_approx(float(capture[2]), expected_dur),
+			"duration=%.2f (esperado %.2f)" % [float(capture[2]), expected_dur])
+
+
 # ── Helpers de busca ──────────────────────────────────────────────────────────
 
 func _find_free_animal() -> Node:
@@ -890,6 +1299,14 @@ func _instantiate_test_bush() -> Node:
 
 
 # ── Infraestrutura de assert / report ─────────────────────────────────────────
+
+func _color_distance(a: Color, b: Color) -> float:
+	var dr := a.r - b.r
+	var dg := a.g - b.g
+	var db := a.b - b.b
+	var da := a.a - b.a
+	return sqrt(dr*dr + dg*dg + db*db + da*da)
+
 
 func _run(test_name: String, fn: Callable) -> void:
 	print("\n[TEST] ▶ ", test_name)
