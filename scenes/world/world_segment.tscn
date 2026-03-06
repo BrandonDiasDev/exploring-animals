@@ -2,8 +2,8 @@
 
 [ext_resource type="PackedScene" uid="uid://b2xk5k78by648" path="res://scenes/components/bush01.tscn" id="2_1d4r4"]
 [ext_resource type="PackedScene" uid="uid://cqbwu75urmps8" path="res://scenes/components/capivara.tscn" id="2_kgxi7"]
-[ext_resource type="Texture2D" uid="uid://buhuf34kqp47a" path="res://assets/backgrounds/0-day.png" id="2_odnmx"]
-[ext_resource type="Texture2D" uid="uid://cpfh05hpryytx" path="res://assets/backgrounds/0-night.png" id="3_xb33a"]
+[ext_resource type="Texture2D" uid="uid://bqq0b5rm2jm75" path="res://assets/backgrounds/1-day.png" id="2_odnmx"]
+[ext_resource type="Texture2D" uid="uid://cgqerdopht16i" path="res://assets/backgrounds/1-night.png" id="3_xb33a"]
 [ext_resource type="Script" uid="uid://chjdudqckkvp" path="res://scripts/world_segment.gd" id="seg_script"]
 
 [node name="WorldSegment" type="Node2D" unique_id=817559777]

@@ -1,9 +1,9 @@
 [gd_scene format=3 uid="uid://c43px4eeuf2it"]
 
 [ext_resource type="PackedScene" uid="uid://bvhtqtt21nuou" path="res://scenes/components/bush02.tscn" id="2_e1dsy"]
-[ext_resource type="Texture2D" uid="uid://cb1ungjx0paxs" path="res://assets/backgrounds/1-day.png" id="2_eyj6s"]
+[ext_resource type="Texture2D" uid="uid://cntsnis27drea" path="res://assets/backgrounds/2-day.png" id="2_eyj6s"]
 [ext_resource type="PackedScene" uid="uid://b26y5t483lssx" path="res://scenes/components/onca.tscn" id="3_e1dsy"]
-[ext_resource type="Texture2D" uid="uid://by3184udymaes" path="res://assets/backgrounds/1-night.png" id="3_po3gx"]
+[ext_resource type="Texture2D" uid="uid://g3p3lfisabem" path="res://assets/backgrounds/2-night.png" id="3_po3gx"]
 [ext_resource type="PackedScene" uid="uid://wmaxxj2rmo7u" path="res://scenes/components/bush03.tscn" id="4_8wsw7"]
 [ext_resource type="PackedScene" uid="uid://brjgm5r7cqny8" path="res://scenes/components/tamandua.tscn" id="5_5p0bt"]
 [ext_resource type="Script" uid="uid://chjdudqckkvp" path="res://scripts/world_segment.gd" id="seg_script"]

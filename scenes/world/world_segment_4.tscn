@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://w48vh7d8hp5e"]
 
-[ext_resource type="Texture2D" uid="uid://b4p6yk8krjaxx" path="res://assets/backgrounds/3-day.png" id="2_fbjwi"]
-[ext_resource type="Texture2D" uid="uid://cdtgwvoxw1kgf" path="res://assets/backgrounds/3-night.png" id="3_lfylt"]
+[ext_resource type="Texture2D" uid="uid://wixbn7nagejg" path="res://assets/backgrounds/4-day.png" id="2_fbjwi"]
+[ext_resource type="Texture2D" uid="uid://dwmxcf1oxpf8g" path="res://assets/backgrounds/4-night.png" id="3_lfylt"]
 [ext_resource type="Script" uid="uid://chjdudqckkvp" path="res://scripts/world_segment.gd" id="seg_script"]
 
 [node name="WorldSegment" type="Node2D" unique_id=817559777]

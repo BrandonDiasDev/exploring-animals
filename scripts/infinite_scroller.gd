@@ -30,6 +30,7 @@ func create_segment_at_offset(offset: int) -> void:
 		"position_offset": offset,
 		"scene_index": scene_index
 	})
+	_set_index_label(segment)
 	
 	# Restaurar estado dos animais
 	call_deferred("restore_segment_animals", segment)
@@ -95,6 +96,28 @@ func find_animals_recursive(node, animals_array):
 		return
 	for child in node.get_children():
 		find_animals_recursive(child, animals_array)
+
+# ─────────────────────────────────────────────────────────────────────────────
+## Shows/updates a debug label on *segment_node* with its world-grid slot
+## number (position.x / world_width). The label is created on first call
+## and reused afterwards.
+func _set_index_label(segment_node: Node2D) -> void:
+	const LABEL_NAME := "_DebugIndexLabel"
+	var lbl: Label = segment_node.get_node_or_null(LABEL_NAME)
+	if lbl == null:
+		lbl = Label.new()
+		lbl.name = LABEL_NAME
+		lbl.z_index = 100
+		lbl.position = Vector2(world_width * 0.5 - 60, 20)
+		var settings := LabelSettings.new()
+		settings.font_size = 64
+		settings.font_color = Color(1, 1, 0, 1)   # yellow
+		settings.outline_color = Color(0, 0, 0, 1)
+		settings.outline_size = 6
+		lbl.label_settings = settings
+		segment_node.add_child(lbl)
+	var slot := int(segment_node.get_meta("scene_index", -1))
+	lbl.text = "%d" % slot
 
 func find_bushes_recursive(node, bushes_array):
 	if not is_instance_valid(node):
@@ -223,6 +246,7 @@ func recycle_segment(index: int, new_x: float) -> void:
 
 	segments[index].node = new_segment
 	segments[index].scene_index = scene_index
+	_set_index_label(new_segment)
 
 	if DebugLogger.scroller: print("[SEGMENT RECYCLE] Created scene_index:", scene_index, "| pos_x:", new_x)
 
