@@ -1,23 +1,23 @@
 [gd_scene format=3 uid="uid://bxwcxrsd0eubi"]
 
-[ext_resource type="Texture2D" uid="uid://c4gnjduiinvj4" path="res://assets/backgrounds/green-day.png" id="1_1d4r4"]
 [ext_resource type="PackedScene" uid="uid://b2xk5k78by648" path="res://scenes/components/bush01.tscn" id="2_1d4r4"]
 [ext_resource type="PackedScene" uid="uid://cqbwu75urmps8" path="res://scenes/components/capivara.tscn" id="2_kgxi7"]
-[ext_resource type="Texture2D" uid="uid://dvj0kchiqhj1j" path="res://assets/backgrounds/green-night.png" id="night_1d4r4"]
-[ext_resource type="Script" path="res://scripts/world_segment.gd" id="seg_script"]
+[ext_resource type="Texture2D" uid="uid://buhuf34kqp47a" path="res://assets/backgrounds/0-day.png" id="2_odnmx"]
+[ext_resource type="Texture2D" uid="uid://cpfh05hpryytx" path="res://assets/backgrounds/0-night.png" id="3_xb33a"]
+[ext_resource type="Script" uid="uid://chjdudqckkvp" path="res://scripts/world_segment.gd" id="seg_script"]
 
 [node name="WorldSegment" type="Node2D" unique_id=817559777]
-metadata/_edit_horizontal_guides_ = [699.0, -701.0]
 script = ExtResource("seg_script")
+metadata/_edit_horizontal_guides_ = [699.0, -701.0]
 
 [node name="BackgroundDay" type="Sprite2D" parent="." unique_id=2099932669]
 z_index = -10
-texture = ExtResource("1_1d4r4")
+texture = ExtResource("2_odnmx")
 
 [node name="BackgroundNight" type="Sprite2D" parent="." unique_id=2099932670]
-z_index = -10
 modulate = Color(1, 1, 1, 0)
-texture = ExtResource("night_1d4r4")
+z_index = -10
+texture = ExtResource("3_xb33a")
 
 [node name="Plane2" type="Node2D" parent="." unique_id=572081845]
 z_as_relative = false

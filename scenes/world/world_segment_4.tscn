@@ -1,21 +1,21 @@
 [gd_scene format=3 uid="uid://w48vh7d8hp5e"]
 
-[ext_resource type="Texture2D" uid="uid://b1klvdbdgb4mh" path="res://assets/backgrounds/purple-day.png" id="day_hghp1"]
-[ext_resource type="Texture2D" uid="uid://di4g6uosybslw" path="res://assets/backgrounds/purple-night.png" id="1_hghp1"]
-[ext_resource type="Script" path="res://scripts/world_segment.gd" id="seg_script"]
+[ext_resource type="Texture2D" uid="uid://b4p6yk8krjaxx" path="res://assets/backgrounds/3-day.png" id="2_fbjwi"]
+[ext_resource type="Texture2D" uid="uid://cdtgwvoxw1kgf" path="res://assets/backgrounds/3-night.png" id="3_lfylt"]
+[ext_resource type="Script" uid="uid://chjdudqckkvp" path="res://scripts/world_segment.gd" id="seg_script"]
 
 [node name="WorldSegment" type="Node2D" unique_id=817559777]
-metadata/_edit_horizontal_guides_ = [699.0, -701.0]
 script = ExtResource("seg_script")
+metadata/_edit_horizontal_guides_ = [699.0, -701.0]
 
 [node name="BackgroundDay" type="Sprite2D" parent="." unique_id=2099932668]
 z_index = -10
-texture = ExtResource("day_hghp1")
+texture = ExtResource("2_fbjwi")
 
 [node name="BackgroundNight" type="Sprite2D" parent="." unique_id=2099932669]
-z_index = -10
 modulate = Color(1, 1, 1, 0)
-texture = ExtResource("1_hghp1")
+z_index = -10
+texture = ExtResource("3_lfylt")
 
 [node name="Plane2" type="Node2D" parent="." unique_id=572081845]
 z_as_relative = false

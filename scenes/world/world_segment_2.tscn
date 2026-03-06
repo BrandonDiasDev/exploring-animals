@@ -1,23 +1,23 @@
 [gd_scene format=3 uid="uid://c43px4eeuf2it"]
 
-[ext_resource type="Texture2D" uid="uid://bp3pxthheqdky" path="res://assets/backgrounds/blue-day.png" id="1_6si38"]
 [ext_resource type="PackedScene" uid="uid://bvhtqtt21nuou" path="res://scenes/components/bush02.tscn" id="2_e1dsy"]
+[ext_resource type="Texture2D" uid="uid://cb1ungjx0paxs" path="res://assets/backgrounds/1-day.png" id="2_eyj6s"]
 [ext_resource type="PackedScene" uid="uid://b26y5t483lssx" path="res://scenes/components/onca.tscn" id="3_e1dsy"]
+[ext_resource type="Texture2D" uid="uid://by3184udymaes" path="res://assets/backgrounds/1-night.png" id="3_po3gx"]
 [ext_resource type="PackedScene" uid="uid://wmaxxj2rmo7u" path="res://scenes/components/bush03.tscn" id="4_8wsw7"]
 [ext_resource type="PackedScene" uid="uid://brjgm5r7cqny8" path="res://scenes/components/tamandua.tscn" id="5_5p0bt"]
-[ext_resource type="Texture2D" uid="uid://jq78aysov5g2" path="res://assets/backgrounds/blue-night.png" id="night_6si38"]
-[ext_resource type="Script" path="res://scripts/world_segment.gd" id="seg_script"]
+[ext_resource type="Script" uid="uid://chjdudqckkvp" path="res://scripts/world_segment.gd" id="seg_script"]
 
 [node name="WorldSegment" type="Node2D" unique_id=1767376223]
-metadata/_edit_horizontal_guides_ = [700.0, -701.0]
 script = ExtResource("seg_script")
+metadata/_edit_horizontal_guides_ = [700.0, -701.0]
 
 [node name="BackgroundDay" type="Sprite2D" parent="." unique_id=959871696]
-texture = ExtResource("1_6si38")
+texture = ExtResource("2_eyj6s")
 
 [node name="BackgroundNight" type="Sprite2D" parent="." unique_id=959871697]
 modulate = Color(1, 1, 1, 0)
-texture = ExtResource("night_6si38")
+texture = ExtResource("3_po3gx")
 
 [node name="Plane2" type="Node2D" parent="." unique_id=1999616768]
 
