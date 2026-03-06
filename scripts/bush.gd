@@ -199,6 +199,14 @@ func reveal_animal():
 
 	animal.is_hidden = false
 	animal.visible = true
+
+	# Align animal bottom to bush bottom (bottom-bottom)
+	var animal_sprite_node = animal.get_node_or_null("Sprite2D")
+	if animal_sprite_node and animal_sprite_node.texture:
+		var bush_bottom = bush_sprite.get_rect().end.y * self.scale.y
+		var animal_half_h = animal_sprite_node.get_rect().end.y
+		animal.position.y = self.position.y + bush_bottom - animal_half_h * target_scale.y
+
 	animal.scale = Vector2(0.05, 0.05)
 
 	var animal_tween = create_tween()
