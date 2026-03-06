@@ -36,6 +36,9 @@ var scroller: bool = true
 ## Hole (buraco): accept/reject check, animal vs allowed list.
 var hole: bool = true
 
+## Sun/Moon: icon creation (size, pivot), position computation (viewport, cam, skyline), place_icons.
+var sun_moon: bool = false
+
 # ─── Helpers ───────────────────────────────────────────────────────────────────
 
 ## Enable all individual categories (and master switch).
@@ -50,6 +53,7 @@ func enable_all() -> void:
 	gravity = true
 	scroller = true
 	hole = true
+	sun_moon = true
 
 ## Disable all individual categories (master switch stays true).
 func disable_all() -> void:
@@ -62,6 +66,7 @@ func disable_all() -> void:
 	gravity = false
 	scroller = false
 	hole = false
+	sun_moon = false
 
 ## Get raw flag value for a category by name (for UI display — ignores master switch).
 func get_category(category: String) -> bool:
@@ -75,6 +80,7 @@ func get_category(category: String) -> bool:
 		"gravity": return gravity
 		"scroller": return scroller
 		"hole": return hole
+		"sun_moon": return sun_moon
 	return false
 
 ## Set a category flag by name.
@@ -89,3 +95,4 @@ func set_category(category: String, value: bool) -> void:
 		"gravity": gravity = value
 		"scroller": scroller = value
 		"hole": hole = value
+		"sun_moon": sun_moon = value

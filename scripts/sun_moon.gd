@@ -13,8 +13,11 @@ const SUN_PATH  := "res://assets/backgrounds/sun.png"
 const MOON_PATH := "res://assets/backgrounds/moon.png"
 
 # ── Parâmetros visuais ────────────────────────────────────────────────────────
-## Tamanho dos ícones em pixels.
-const ICON_SIZE := Vector2(80.0, 80.0)
+## Tamanho da lua em pixels.
+const MOON_SIZE := Vector2(80.0, 80.0)
+## Tamanho do sol em pixels. Ajuste livremente — a transição continuará centrada.
+## Referência: 1.5× a lua = 120 px, 2× = 160 px.
+const SUN_SIZE  := Vector2(120.0, 120.0)
 
 # ── Parâmetros de posicionamento ─────────────────────────────────────────────
 ## Margem em relação à borda direita da tela (pixels).
@@ -52,8 +55,8 @@ var _moon: TextureRect
 var _is_day:    bool  = true
 var _animating: bool  = false
 
-## Y base dos astros na tela (recalculado ao redimensionar / por frame).
-var _base_y: float = 0.0
+## Centro compartilhado dos astros na tela (recalculado ao redimensionar / por frame).
+var _base_center: Vector2 = Vector2.ZERO
 
 # ─────────────────────────────────────────────────────────────────────────────
 func _ready() -> void:
@@ -61,10 +64,14 @@ func _ready() -> void:
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	_sun  = _make_icon(SUN_PATH,  "Sun")
-	_moon = _make_icon(MOON_PATH, "Moon")
+	_sun  = _make_icon(SUN_PATH,  "Sun",  SUN_SIZE)
+	_moon = _make_icon(MOON_PATH, "Moon", MOON_SIZE)
 	add_child(_sun)
 	add_child(_moon)
+	# Re-assert size after entering the tree — TextureRect can inflate to texture's
+	# native pixel size otherwise, breaking all position math.
+	_sun.size  = SUN_SIZE
+	_moon.size = MOON_SIZE
 
 	# Estado inicial: dia
 	_moon.modulate.a = 0.0
@@ -81,52 +88,65 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	# Recalcula posição a cada frame — garante que zoom/câmera sejam respeitados.
 	# Se não estiver animando, move os ícones junto.
-	var new_pos := _compute_position()
-	if new_pos != Vector2(_sun.position.x, _base_y):
-		_base_y = new_pos.y
+	var new_center := _compute_position()
+	if new_center != _base_center:
+		_base_center = new_center
 		if not _animating:
-			_sun.position  = new_pos
-			_moon.position = new_pos
+			_sun.position  = new_center - _sun.size * 0.5
+			_moon.position = new_center - _moon.size * 0.5
+		if DebugLogger.enabled and DebugLogger.sun_moon:
+			var cam := get_viewport().get_camera_2d()
+			var vp  := get_viewport_rect().size
+			print("[SunMoon] _process: center changed → new_center=%s  animating=%s  cam.pos=%s  cam.zoom=%s  vp=%s" % [new_center, _animating, (cam.global_position if cam else "NO CAM"), (cam.zoom if cam else "NO CAM"), vp])
 
 # ─────────────────────────────────────────────────────────────────────────────
-func _make_icon(path: String, node_name: String) -> TextureRect:
+func _make_icon(path: String, node_name: String, icon_size: Vector2) -> TextureRect:
 	var rect          := TextureRect.new()
 	rect.name         = node_name
 	rect.texture      = load(path)
-	rect.size         = ICON_SIZE
+	rect.expand_mode  = TextureRect.EXPAND_IGNORE_SIZE
 	rect.stretch_mode = TextureRect.STRETCH_SCALE
+	rect.custom_minimum_size = icon_size
+	rect.size         = icon_size
+	rect.pivot_offset = icon_size * 0.5
 	rect.mouse_filter = Control.MOUSE_FILTER_STOP
 	rect.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	if DebugLogger.enabled and DebugLogger.sun_moon:
+		print("[SunMoon] _make_icon '%s'  size=%s  pivot_offset=%s" % [node_name, rect.size, rect.pivot_offset])
 	return rect
 
 # ─────────────────────────────────────────────────────────────────────────────
-## Calcula a posição-alvo do ícone em coordenadas de tela.
+## Retorna o CENTRO compartilhado dos astros em coordenadas de tela.
+## Cada ícone é posicionado em (centro - tamanho/2) para ficar centralizado.
 func _compute_position() -> Vector2:
 	var vp  := get_viewport_rect().size
 	var cam := get_viewport().get_camera_2d()
 
-	var icon_x := vp.x - MARGIN_RIGHT - ICON_SIZE.x
-	var icon_y : float
+	# center_x: distância da borda direita até o centro do ícone.
+	var center_x := vp.x - MARGIN_RIGHT
+	var center_y : float
 
 	if cam:
 		var cfg       := get_node_or_null("/root/WorldConfig")
 		var skyline_y : float = cfg.skyline_y if cfg else -444.0
 		# Converte Y do mundo para Y da tela
 		var screen_sky_y := (skyline_y - cam.global_position.y) * cam.zoom.y + vp.y * 0.5
-		icon_y = screen_sky_y - MARGIN_ABOVE_SKYLINE - ICON_SIZE.y
+		center_y = screen_sky_y - MARGIN_ABOVE_SKYLINE
 	else:
-		icon_y = vp.y * 0.10  # fallback sem câmera
+		center_y = vp.y * 0.10  # fallback sem câmera
 
-	# Garante que nunca sai pela parte de cima da tela
-	icon_y = maxf(icon_y, MARGIN_TOP)
+	# Garante que o centro nunca sai pela parte de cima da tela
+	center_y = maxf(center_y, MARGIN_TOP)
 
-	return Vector2(icon_x, icon_y)
+	return Vector2(center_x, center_y)
 
 func _place_icons() -> void:
-	var pos    := _compute_position()
-	_base_y    = pos.y
-	_sun.position  = pos
-	_moon.position = pos
+	var center     := _compute_position()
+	_base_center   = center
+	_sun.position  = center - _sun.size * 0.5
+	_moon.position = center - _moon.size * 0.5
+	if DebugLogger.enabled and DebugLogger.sun_moon:
+		print("[SunMoon] _place_icons  center=%s  sun.pos=%s  sun.size=%s  moon.pos=%s  moon.size=%s" % [center, _sun.position, _sun.size, _moon.position, _moon.size])
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_RESIZED:
@@ -134,6 +154,9 @@ func _notification(what: int) -> void:
 
 # ─────────────────────────────────────────────────────────────────────────────
 func _on_sun_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		if DebugLogger.enabled and DebugLogger.sun_moon:
+			print("[SunMoon] SUN clicked  _animating=%s  _is_day=%s  sun.pos=%s  sun.size=%s  sun.pivot_offset=%s" % [_animating, _is_day, _sun.position, _sun.size, _sun.pivot_offset])
 	if _animating or not _is_day:
 		return
 	if event is InputEventMouseButton \
@@ -142,6 +165,9 @@ func _on_sun_input(event: InputEvent) -> void:
 		_animate_transition(false)   # dia → noite
 
 func _on_moon_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		if DebugLogger.enabled and DebugLogger.sun_moon:
+			print("[SunMoon] MOON clicked  _animating=%s  _is_day=%s  moon.pos=%s  moon.size=%s  moon.pivot_offset=%s" % [_animating, _is_day, _moon.position, _moon.size, _moon.pivot_offset])
 	if _animating or _is_day:
 		return
 	if event is InputEventMouseButton \
@@ -163,31 +189,38 @@ func _animate_transition(to_day: bool) -> void:
 		cfg.is_day = to_day
 	day_night_transition_started.emit(to_day, BG_TRANSITION_DURATION)
 
+	var leaving     : TextureRect = _sun  if not to_day else _moon
+	var arriving    : TextureRect = _moon if not to_day else _sun
+	var base_center : Vector2     = _base_center
 
-	var leaving  : TextureRect = _sun  if not to_day else _moon
-	var arriving : TextureRect = _moon if not to_day else _sun
-	var base_y   : float       = _base_y
+	if DebugLogger.enabled and DebugLogger.sun_moon:
+		print("[SunMoon] _animate_transition  to_day=%s  _base_center=%s" % [to_day, base_center])
+		print("[SunMoon]   leaving  ('%s')  pos=%s  size=%s  pivot_offset=%s  modulate.a=%.2f" % [leaving.name,  leaving.position,  leaving.size,  leaving.pivot_offset,  leaving.modulate.a])
+		print("[SunMoon]   arriving ('%s')  pos=%s  size=%s  pivot_offset=%s  modulate.a=%.2f" % [arriving.name, arriving.position, arriving.size, arriving.pivot_offset, arriving.modulate.a])
 
 	# ── 1. Pôr: desce e desaparece ────────────────────────────────────────────
 	var tw_out := create_tween()
 	tw_out.set_parallel(true)
-	tw_out.tween_property(leaving, "position:y", base_y + SET_OFFSET_Y, ANIM_DURATION) \
+	tw_out.tween_property(leaving, "position:y",
+			base_center.y + SET_OFFSET_Y - leaving.size.y * 0.5, ANIM_DURATION) \
 		.set_ease(EASE_OUT_CURVE).set_trans(Tween.TRANS_QUAD)
 	tw_out.tween_property(leaving, "modulate:a", 0.0, ANIM_DURATION)
 	await tw_out.finished
 
 	leaving.visible    = false
-	leaving.position.y = _base_y   # reseta para a posição base (pode ter mudado)
+	leaving.position   = _base_center - leaving.size * 0.5   # reseta (pode ter mudado)
 	leaving.modulate.a = 1.0
 
 	# ── 2. Nascer: sobe e aparece ─────────────────────────────────────────────
-	arriving.position.y = base_y + SET_OFFSET_Y
+	arriving.position   = Vector2(base_center.x - arriving.size.x * 0.5,
+								  base_center.y + SET_OFFSET_Y - arriving.size.y * 0.5)
 	arriving.modulate.a = 0.0
 	arriving.visible    = true
 
 	var tw_in := create_tween()
 	tw_in.set_parallel(true)
-	tw_in.tween_property(arriving, "position:y", base_y, ANIM_DURATION) \
+	tw_in.tween_property(arriving, "position:y",
+			base_center.y - arriving.size.y * 0.5, ANIM_DURATION) \
 		.set_ease(EASE_IN_CURVE).set_trans(Tween.TRANS_QUAD)
 	tw_in.tween_property(arriving, "modulate:a", 1.0, ANIM_DURATION)
 	await tw_in.finished
