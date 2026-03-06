@@ -22,12 +22,12 @@ texture = ExtResource("3_xb33a")
 [node name="Plane2" type="Node2D" parent="." unique_id=572081845]
 z_as_relative = false
 
-[node name="Bush01" parent="Plane2" unique_id=70398715 instance=ExtResource("2_1d4r4")]
-position = Vector2(307, 452)
-
 [node name="Plane1" type="Node2D" parent="." unique_id=1453074001]
 z_index = 10
 z_as_relative = false
+
+[node name="Bush01" parent="Plane1" unique_id=70398715 instance=ExtResource("2_1d4r4")]
+position = Vector2(307, 452)
 
 [node name="Capivara" parent="Plane1" unique_id=2114954864 instance=ExtResource("2_kgxi7")]
 position = Vector2(-808, 634)
