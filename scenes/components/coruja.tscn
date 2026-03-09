@@ -1,0 +1,24 @@
+[gd_scene format=3 uid="uid://cbvojaadefq5n"]
+
+[ext_resource type="Script" uid="uid://dymxkx07niar6" path="res://scripts/animal.gd" id="1_1rq6k"]
+[ext_resource type="Texture2D" uid="uid://dnb7c415apn8g" path="res://assets/animals/coruja-murucutu.png" id="2_wa6cn"]
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_ne2vd"]
+radius = 28.0
+height = 100.0
+
+[node name="Coruja" type="Node2D" unique_id=342004318]
+script = ExtResource("1_1rq6k")
+animal_name = "Coruja"
+current_plane = "plane1"
+can_fly = true
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=1278010209]
+texture = ExtResource("2_wa6cn")
+
+[node name="Area2D" type="Area2D" parent="." unique_id=1632670514]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=1932434113]
+shape = SubResource("CapsuleShape2D_ne2vd")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=1044426050]

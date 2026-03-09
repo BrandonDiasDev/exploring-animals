@@ -1,0 +1,26 @@
+[gd_scene format=3 uid="uid://c1iexdg6a6nfx"]
+
+[ext_resource type="Script" uid="uid://dymxkx07niar6" path="res://scripts/animal.gd" id="1_kktl0"]
+[ext_resource type="Texture2D" uid="uid://d0xw18fpo4wdp" path="res://assets/animals/uruatu.png" id="2_fwvl0"]
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_eso8s"]
+radius = 19.0
+height = 100.0
+
+[node name="Uruatu" type="Node2D" unique_id=342004318]
+script = ExtResource("1_kktl0")
+animal_name = "Uruatu"
+current_plane = "plane1"
+can_fly = true
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=1278010209]
+texture = ExtResource("2_fwvl0")
+
+[node name="Area2D" type="Area2D" parent="." unique_id=1632670514]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=850344692]
+position = Vector2(-2.999998, -3)
+rotation = 0.2514441
+shape = SubResource("CapsuleShape2D_eso8s")
+
+[node name="AnimationPlayer" type="AnimationPlayer" parent="." unique_id=1044426050]
