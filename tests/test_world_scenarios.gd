@@ -127,6 +127,13 @@ func run_all() -> void:
 	await _run("G12-L — WorldManager propaga snap dia para segmentos",        _g12l_wm_propagates_day)
 	await _run("G12-M — SunMoon emite sinal com parâmetros corretos",         _g12m_sun_moon_emits_signal)
 
+	# ── Grupo 13: FSM Invariants ──────────────────────────────────────────────────
+	await _run("G13-A — animal sempre normalizado para IDLE após transition_to(IDLE)", _g13a_idle_transition)
+	await _run("G13-B — can_fly=false usa FALL, não FLY, ao chamar apply_gravity",     _g13b_no_fly_for_ground_animal)
+	await _run("G13-C — fly_duration curto pousa automaticamente (FLY → IDLE)",        _g13c_fly_duration_lands)
+	await _run("G13-D — animal aceito na moita está em IDLE",                          _g13d_hidden_animal_is_idle)
+	await _run("G13-E — notify_day_night_changed atualiza idle_visual em IDLE",        _g13e_day_night_idle_visual)
+
 	_footer()
 
 
@@ -1237,6 +1244,177 @@ func _g12m_sun_moon_emits_signal() -> void:
 		var expected_dur: float = sun_moon.get("BG_TRANSITION_DURATION") if sun_moon.get("BG_TRANSITION_DURATION") else 4.5
 		_assert(is_equal_approx(float(capture[2]), expected_dur),
 			"duration=%.2f (esperado %.2f)" % [float(capture[2]), expected_dur])
+
+
+# ── Grupo 13: FSM Invariants ──────────────────────────────────────────────────
+
+# G13-A: transition_to(IDLE) zera o estado, mata tweens, e chama _update_idle_visual.
+# Verifica que current_state == IDLE após a chamada, independente do estado anterior.
+func _g13a_idle_transition() -> void:
+	var dummy := _instantiate_dummy_animal()
+	if not dummy:
+		_skip_test("não foi possível criar animal de teste")
+		return
+	if dummy.get("current_state") == null:
+		dummy.queue_free()
+		_skip_test("animal de teste não tem current_state (FSM não implementado)")
+		return
+	# Estado inicial deve ser IDLE = 0
+	_assert(dummy.get("current_state") == 0,
+		"estado inicial deveria ser IDLE (0), está em: " + str(dummy.get("current_state")))
+	# Forçar FALL simulando queda (se acima da terra)
+	var cfg := get_node_or_null("/root/WorldConfig")
+	if cfg:
+		dummy.position.y = cfg.background_earth_y - 200.0
+	dummy.set("can_fly", false)
+	dummy.apply_gravity()
+	await get_tree().process_frame
+	var _state_after_gravity: int = dummy.get("current_state")
+	# Cancelar via transition_to(IDLE)
+	if dummy.has_method("transition_to"):
+		dummy.transition_to(Animal.AnimalState.IDLE)
+	_assert(dummy.get("current_state") == 0,
+		"current_state deveria ser IDLE (0) após transition_to(IDLE), está em: " + str(dummy.get("current_state")))
+	_assert(dummy.get("fall_tween") == null or not dummy.get("fall_tween").is_valid(),
+		"fall_tween deveria ter sido morto ao sair do estado FALL")
+	dummy.queue_free()
+	await get_tree().process_frame
+
+
+# G13-B: apply_gravity() com can_fly=false deve usar FALL (2), nunca FLY (1).
+func _g13b_no_fly_for_ground_animal() -> void:
+	var dummy := _instantiate_dummy_animal()
+	if not dummy:
+		_skip_test("não foi possível criar animal de teste")
+		return
+	if dummy.get("current_state") == null:
+		dummy.queue_free()
+		_skip_test("animal de teste não tem current_state (FSM não implementado)")
+		return
+	dummy.set("can_fly", false)
+	# Posicionar acima da linha de terra para garantir que apply_gravity() dispare
+	var cfg := get_node_or_null("/root/WorldConfig")
+	if not cfg:
+		dummy.queue_free()
+		_skip_test("WorldConfig não disponível")
+		return
+	dummy.position.y = cfg.background_earth_y - 300.0
+	var result: bool = dummy.apply_gravity()
+	var fsm_state: int = dummy.get("current_state")
+	_assert(result, "apply_gravity() deveria retornar true (animal acima da linha de terra com can_fly=false)")
+	_assert(fsm_state == 2,
+		"can_fly=false deveria resultar em FALL (2), got: " + str(fsm_state))
+	_assert(fsm_state != 1, "can_fly=false nunca deve resultar em FLY (1)")
+	# Cancelar queda antes de destruir
+	if dummy.has_method("transition_to"):
+		dummy.transition_to(Animal.AnimalState.IDLE)
+	dummy.queue_free()
+	await get_tree().process_frame
+
+
+# G13-C: animal com can_fly=true e fly_duration muito curto deve pousar em IDLE automaticamente.
+func _g13c_fly_duration_lands() -> void:
+	var dummy := _instantiate_dummy_animal()
+	if not dummy:
+		_skip_test("não foi possível criar animal de teste")
+		return
+	if dummy.get("current_state") == null:
+		dummy.queue_free()
+		_skip_test("animal de teste não tem current_state (FSM não implementado)")
+		return
+	dummy.set("can_fly", true)
+	dummy.set("fly_duration", 0.05)  # 50ms — expira quase instantaneamente
+	dummy.apply_gravity()
+	var state_after_fly: int = dummy.get("current_state")
+	_assert(state_after_fly == 1,
+		"deveria estar em FLY (1) após apply_gravity com can_fly=true, está em: " + str(state_after_fly))
+	# Aguardar tempo suficiente para o fly_duration expirar via _process
+	await get_tree().create_timer(0.20).timeout
+	await get_tree().process_frame
+	var state_after_timer: int = dummy.get("current_state")
+	_assert(state_after_timer == 0,
+		"deveria estar em IDLE (0) após fly_duration expirar, está em: " + str(state_after_timer))
+	dummy.queue_free()
+	await get_tree().process_frame
+
+
+# G13-D: animal solto numa moita deve estar em IDLE ao ser aceito.
+# bush.try_accept_animal deve forçar IDLE antes de chamar _accept_animal.
+func _g13d_hidden_animal_is_idle() -> void:
+	var dummy_animal := _instantiate_dummy_animal()
+	var test_bush := _instantiate_test_bush()
+	if not dummy_animal or not test_bush:
+		if dummy_animal: dummy_animal.queue_free()
+		if test_bush: test_bush.queue_free()
+		_skip_test("não foi possível criar animal ou moita de teste")
+		return
+	if dummy_animal.get("current_state") == null:
+		dummy_animal.queue_free()
+		test_bush.queue_free()
+		_skip_test("animal de teste não tem current_state (FSM não implementado)")
+		return
+	# Forçar estado FALL artificial
+	dummy_animal.set("current_state", Animal.AnimalState.FALL)
+	_assert(dummy_animal.get("current_state") == 2,
+		"pré-condição: current_state deveria ser FALL (2)")
+	# Limpar accepted_animal_names para aceitar qualquer animal
+	(test_bush as Bush).accepted_animal_names.clear()
+	test_bush.try_accept_animal(dummy_animal)
+	await get_tree().process_frame
+	var fsm_state: int = dummy_animal.get("current_state")
+	_assert(fsm_state == 0,
+		"animal aceito na moita deveria estar em IDLE (0), está em: " + str(fsm_state))
+	# Cleanup
+	var bush_animal: Node = test_bush.get("current_hidden_animal")
+	if bush_animal and is_instance_valid(bush_animal):
+		bush_animal.queue_free()
+	test_bush.queue_free()
+	await get_tree().process_frame
+
+
+# G13-E: notify_day_night_changed deve atualizar idle_visual ao mudar para noite/dia
+# quando o animal está em estado IDLE. Animais em FLY/FALL não devem ser afetados.
+func _g13e_day_night_idle_visual() -> void:
+	var dummy := _instantiate_dummy_animal()
+	if not dummy:
+		_skip_test("não foi possível criar animal de teste")
+		return
+	if not dummy.has_method("notify_day_night_changed"):
+		dummy.queue_free()
+		_skip_test("animal de teste não tem notify_day_night_changed (FSM não implementado)")
+		return
+	# Criar textura de teste para sleep
+	var sleep_tex := ImageTexture.new()
+	dummy.set("idle_sleep_texture", sleep_tex)
+	# Garantir estado IDLE
+	if dummy.has_method("transition_to"):
+		dummy.transition_to(Animal.AnimalState.IDLE)
+	var cfg := get_node_or_null("/root/WorldConfig")
+	var orig_is_day: bool = cfg.is_day if cfg else true
+	# Simular transição para noite
+	if cfg:
+		cfg.is_day = false
+	dummy.notify_day_night_changed(false)
+	var tex_night: Texture2D = dummy.get_node_or_null("Sprite2D").texture if dummy.get_node_or_null("Sprite2D") else null
+	_assert(tex_night == sleep_tex,
+		"idle_visual deveria ser idle_sleep_texture durante a noite")
+	# Simular transição para FLY e depois mudar dia/noite — textura NÃO deve mudar
+	dummy.set("can_fly", true)
+	dummy.set("fly_duration", 999.0)
+	dummy.apply_gravity()
+	if cfg:
+		cfg.is_day = true
+	dummy.notify_day_night_changed(true)
+	var tex_fly: Texture2D = dummy.get_node_or_null("Sprite2D").texture if dummy.get_node_or_null("Sprite2D") else null
+	_assert(tex_fly == sleep_tex,
+		"idle_visual NÃO deve mudar enquanto animal está em FLY")
+	# Restaurar
+	if cfg:
+		cfg.is_day = orig_is_day
+	if dummy.has_method("transition_to"):
+		dummy.transition_to(Animal.AnimalState.IDLE)
+	dummy.queue_free()
+	await get_tree().process_frame
 
 
 # ── Helpers de busca ──────────────────────────────────────────────────────────

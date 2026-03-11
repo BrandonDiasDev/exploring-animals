@@ -3,6 +3,8 @@ class_name Animal
 
 const _WorldConfig := preload("res://scripts/world_config.gd")
 
+enum AnimalState { IDLE, FLY, FALL }
+
 signal animal_clicked(animal: Animal)
 signal animal_drag_started(animal: Animal)
 signal animal_drag_ended(animal: Animal)
@@ -13,6 +15,12 @@ signal animal_drag_ended(animal: Animal)
 @export var is_hidden := false
 ## Se verdadeiro, a gravidade NÃO afeta este animal (ex: pássaros voadores).
 @export var can_fly: bool = false
+## Textura do animal acordado (IDLE + dia). Deixe vazio para usar a textura do Sprite2D da cena.
+@export var idle_awake_texture: Texture2D
+## Textura do animal dormindo (IDLE + noite). Deixe vazio para não alterar textura à noite.
+@export var idle_sleep_texture: Texture2D
+## Duração do voo em segundos antes do pouso automático (só se can_fly=true).
+@export var fly_duration: float = 5.0
 
 @onready var sprite: Sprite2D = $Sprite2D
 @onready var area: Area2D = $Area2D
@@ -26,8 +34,9 @@ const LONG_PRESS_TIME := 0.5
 var is_pressed := false
 var mouse_captured := false
 
-## Estado de queda (gravidade)
-var is_falling: bool = false
+## Estado FSM do animal (IDLE / FLY / FALL)
+var current_state: AnimalState = AnimalState.IDLE
+var _fly_timer: float = 0.0
 var fall_tween: Tween = null
 
 func _ready():
@@ -136,9 +145,20 @@ func _process(delta):
 			# Verificar novamente se ainda está pressionado
 			if is_pressed and mouse_captured:  # NOVO: Double check
 				start_drag()
+	# Temporizador de voo: pousa automaticamente após fly_duration expirar
+	if current_state == AnimalState.FLY:
+		_fly_timer += delta
+		if _fly_timer >= fly_duration:
+			if DebugLogger.animal_fsm:
+				print("[FSM] ", animal_name, ": voo expirou (", "%.1f" % _fly_timer, "s) → IDLE")
+			transition_to(AnimalState.IDLE)
+			check_plane_change()
+			var _wm := get_tree().get_first_node_in_group("world_manager")
+			if _wm and _wm.has_method("save_animal_state"):
+				_wm.save_animal_state(self)
 
 func on_click():
-	_cancel_fall()  # Queda cancelada pelo clique; ação normal retoma
+	_cancel_transition()  # Transação cancelada pelo clique; ação normal retoma
 	emit_signal("animal_clicked", self)
 	play_click_animation()
 	play_sound()
@@ -151,7 +171,7 @@ func start_drag():
 	if not is_pressed or not mouse_captured:
 		return
 	
-	_cancel_fall()  # Pode estar caindo; drag assume controle
+	_cancel_transition()  # Pode estar caindo ou voando; drag assume controle
 	if DebugLogger.drag: print("[DRAG START] Animal:", animal_name, "| pos:", position)
 	is_being_dragged = true
 	drag_offset = global_position - get_global_mouse_position()
@@ -342,15 +362,75 @@ func _reparent_to_plane(target_plane_name: String):
 	global_position = gpos
 	if DebugLogger.plane: print("[REPARENT PLANE] ", animal_name, " ", current_parent.name, " -> ", target_node_name)
 
+# ── FSM ──────────────────────────────────────────────────────────────────────
+
+## Ponto de entrada único para todas as mudanças de estado do animal.
+## Garante que _exit_state e _enter_state são sempre chamados em par.
+func transition_to(new_state: AnimalState) -> void:
+	if current_state == new_state:
+		return
+	var old_state := current_state
+	if DebugLogger.animal_fsm:
+		print("[FSM] ", animal_name, ": ", AnimalState.keys()[old_state], " → ", AnimalState.keys()[new_state])
+	_exit_state(old_state)
+	current_state = new_state
+	_enter_state(new_state)
+
+func _exit_state(state: AnimalState) -> void:
+	match state:
+		AnimalState.FALL:
+			if fall_tween and fall_tween.is_valid():
+				fall_tween.kill()
+			fall_tween = null
+		AnimalState.FLY:
+			_fly_timer = 0.0
+		AnimalState.IDLE:
+			pass  # sem cleanup necessário
+
+func _enter_state(state: AnimalState) -> void:
+	match state:
+		AnimalState.IDLE:
+			_update_idle_visual()
+		AnimalState.FLY:
+			_fly_timer = 0.0
+			# Animação de voo (se existir na cena)
+			if animation_player and animation_player.has_animation("fly"):
+				animation_player.play("fly")
+		AnimalState.FALL:
+			_start_fall_tween()
+
+func _update_idle_visual() -> void:
+	"""Atualiza a textura do Sprite2D com base no estado dia/noite atual."""
+	var cfg := get_node_or_null("/root/WorldConfig") as _WorldConfig
+	var is_night := (cfg != null and not cfg.is_day)
+	if is_night and idle_sleep_texture != null:
+		sprite.texture = idle_sleep_texture
+	elif idle_awake_texture != null:
+		sprite.texture = idle_awake_texture
+	# Se ambas forem nulas, mantém a textura atual definida na cena.
+	if DebugLogger.animal_fsm:
+		var vis := "sleep" if (is_night and idle_sleep_texture != null) else "awake"
+		print("[FSM] ", animal_name, ": idle_visual = ", vis)
+
+## Chamado pelo WorldManager quando o ciclo dia/noite muda.
+## Só atua em estado IDLE — FLY e FALL não alteram textura.
+func notify_day_night_changed(_to_day: bool) -> void:
+	if current_state == AnimalState.IDLE:
+		_update_idle_visual()
+
 # ── Gravidade ─────────────────────────────────────────────────────────────────
 
+## Ponto de entrada para aplicar gravidade/voo após soltar o animal ou revelá-lo.
+## can_fly=true  → transição para FLY (voo livre com timer).
+## can_fly=false → transição para FALL se acima da linha de terra.
+## Retorna true se iniciou uma transição, false se o animal já está em posição final.
 func apply_gravity() -> bool:
-	"""Verifica se o animal está acima da background_earth_y e, se sim, inicia a queda.
-	Retorna true se a queda foi iniciada, false se não foi necessária.
-	Seguro chamar enquanto a tela se move: o tween opera em position.y local,
-	que é estável porque os segmentos só se deslocam no eixo X."""
-	if can_fly or is_being_dragged or is_hidden or is_falling:
+	if is_being_dragged or is_hidden or current_state != AnimalState.IDLE:
 		return false
+
+	if can_fly:
+		transition_to(AnimalState.FLY)
+		return true
 
 	var cfg := get_node_or_null("/root/WorldConfig") as _WorldConfig
 	if not cfg:
@@ -364,6 +444,21 @@ func apply_gravity() -> bool:
 
 	if feet_y >= cfg.background_earth_y:
 		return false  # Já está na terra ou abaixo — sem queda necessária
+
+	transition_to(AnimalState.FALL)
+	return true
+
+func _start_fall_tween() -> void:
+	"""Inicia o tween de queda. Chamado por _enter_state(FALL)."""
+	var cfg := get_node_or_null("/root/WorldConfig") as _WorldConfig
+	if not cfg:
+		transition_to(AnimalState.IDLE)
+		return
+
+	const FEET_OFFSET_G := 20.0
+	var feet_y := global_position.y
+	if sprite and sprite.texture:
+		feet_y += sprite.texture.get_height() / 2.0 * scale.y + FEET_OFFSET_G
 
 	# Destino: pés pousam em Y aleatório entre background_earth_y e o centro (0)
 	var target_feet_y := randf_range(cfg.background_earth_y, 0.0)
@@ -382,7 +477,6 @@ func apply_gravity() -> bool:
 	var fall_distance := absf(target_global_y - global_position.y)
 	var fall_duration := clampf(fall_distance / 400.0, 0.3, 1.2)
 
-	is_falling = true
 	if fall_tween and fall_tween.is_valid():
 		fall_tween.kill()
 	fall_tween = create_tween()
@@ -396,23 +490,20 @@ func apply_gravity() -> bool:
 			" caindo de feet_y:", "%.0f" % feet_y,
 			" -> target_feet_y:", "%.0f" % target_feet_y,
 			" | duracao:", "%.2f" % fall_duration, "s")
-	return true
 
-func _cancel_fall():
-	"""Cancela a queda em andamento. Chamado ao iniciar drag ou ao clicar."""
-	if not is_falling:
+func _cancel_transition() -> void:
+	"""Cancela qualquer transição em andamento (FALL ou FLY). Chamado ao iniciar drag ou clicar."""
+	if current_state == AnimalState.IDLE:
 		return
-	if fall_tween and fall_tween.is_valid():
-		fall_tween.kill()
-	fall_tween = null
-	is_falling = false
-	if DebugLogger.gravity: print("[GRAVITY CANCEL] ", animal_name, " em y:", "%.0f" % global_position.y)
+	if DebugLogger.gravity:
+		print("[FSM CANCEL] ", animal_name, " estado:", AnimalState.keys()[current_state], " em y:", "%.0f" % global_position.y)
+	transition_to(AnimalState.IDLE)
 
 func _on_fall_finished():
 	"""Callback do tween de queda. Ajusta plano e salva estado."""
-	is_falling = false
 	fall_tween = null
 	if DebugLogger.gravity: print("[GRAVITY LAND] ", animal_name, " pousou em y:", "%.0f" % global_position.y)
+	transition_to(AnimalState.IDLE)
 	check_plane_change()
 	var world_manager := get_tree().get_first_node_in_group("world_manager")
 	if world_manager and world_manager.has_method("save_animal_state"):

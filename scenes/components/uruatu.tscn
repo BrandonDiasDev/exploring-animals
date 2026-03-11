@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://dymxkx07niar6" path="res://scripts/animal.gd" id="1_kktl0"]
 [ext_resource type="Texture2D" uid="uid://d0xw18fpo4wdp" path="res://assets/animals/uruatu.png" id="2_fwvl0"]
+[ext_resource type="Texture2D" uid="uid://dgnl2ppwtjtr0" path="res://assets/animals/sleep.png" id="3_eso8s"]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_eso8s"]
 radius = 19.0
@@ -12,6 +13,8 @@ script = ExtResource("1_kktl0")
 animal_name = "Uruatu"
 current_plane = "plane1"
 can_fly = true
+idle_awake_texture = ExtResource("2_fwvl0")
+idle_sleep_texture = ExtResource("3_eso8s")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=1278010209]
 texture = ExtResource("2_fwvl0")

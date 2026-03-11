@@ -38,6 +38,9 @@ func validate(wm: Node, label: String = "", silent: bool = false) -> bool:
 	_check_state_count_sanity(wm)
 	_check_local_pos_in_bounds(wm)
 	_check_allowlist_consistency(wm)
+	_check_fsm_hidden_idle(wm)
+	_check_fsm_no_fly_for_ground(wm)
+	_check_fsm_state_valid(wm)
 
 	var prefix := "[VALIDATOR%s]" % (" <%s>" % label if label != "" else "")
 
@@ -333,4 +336,82 @@ func _check_allowlist_consistency(wm: Node) -> void:
 				+ "accepted_animal_names=%s não inclui esse animal. "
 				+ "Verifique a configuração da cena."
 				% [bush.name, hidden.name, aname, str(allowlist)]
+			)
+
+
+# ─── Verificação 12 — animais ocultos devem estar em IDLE ────────────────────
+func _check_fsm_hidden_idle(wm: Node) -> void:
+	## Todo animal com is_hidden=true deve ter current_state == IDLE (0).
+	## FLY ou FALL enquanto escondido numa moita é corrupção: a moita jamais
+	## exibe um animal voando ou caindo.
+	var animals_state: Dictionary = wm.animals_state
+	for key: String in animals_state.keys():
+		if key.ends_with("_active_node"):
+			continue
+		var state = animals_state[key]
+		if not state is Dictionary:
+			continue
+		if not state.get("is_hidden", false):
+			continue
+		var active_key := key + "_active_node"
+		if not animals_state.has(active_key):
+			continue
+		var node = animals_state[active_key]
+		if not is_instance_valid(node):
+			continue
+		var fsm_state = node.get("current_state")
+		if fsm_state == null:
+			continue  # Script sem FSM — pular
+		if fsm_state != 0:  # 0 = AnimalState.IDLE
+			errors.append(
+				"'%s' é is_hidden=true mas current_state=%d (esperado IDLE=0). "
+				% [key, fsm_state]
+				+ "Animal não pode estar em FLY/FALL enquanto escondido numa moita."
+			)
+
+
+# ─── Verificação 13 — animais sem asas não voam ───────────────────────────────
+func _check_fsm_no_fly_for_ground(wm: Node) -> void:
+	## Animais com can_fly=false nunca devem estar em estado FLY (1).
+	## Indica que apply_gravity() despachou para FLY sem permissão.
+	var animals_state: Dictionary = wm.animals_state
+	for key: String in animals_state.keys():
+		if not key.ends_with("_active_node"):
+			continue
+		var node = animals_state[key]
+		if not is_instance_valid(node):
+			continue
+		var can_fly = node.get("can_fly")
+		if can_fly == null or can_fly == true:
+			continue  # Sem restrição de voo
+		var fsm_state = node.get("current_state")
+		if fsm_state == null:
+			continue
+		if fsm_state == 1:  # 1 = AnimalState.FLY
+			errors.append(
+				"'%s' tem can_fly=false mas current_state=FLY (1). "
+				% [key.trim_suffix("_active_node")]
+				+ "apply_gravity() não deveria ter despachado para FLY."
+			)
+
+
+# ─── Verificação 14 — valor do enum FSM é válido ─────────────────────────────
+func _check_fsm_state_valid(wm: Node) -> void:
+	## current_state deve ser um valor válido de AnimalState: 0 (IDLE), 1 (FLY) ou 2 (FALL).
+	## Valor inválido indica corrupção (ex: atribuição direta sem passar por transition_to).
+	var animals_state: Dictionary = wm.animals_state
+	for key: String in animals_state.keys():
+		if not key.ends_with("_active_node"):
+			continue
+		var node = animals_state[key]
+		if not is_instance_valid(node):
+			continue
+		var fsm_state = node.get("current_state")
+		if fsm_state == null:
+			continue  # Script sem FSM — pular
+		if not (fsm_state == 0 or fsm_state == 1 or fsm_state == 2):
+			errors.append(
+				"'%s' tem current_state=%s que não é um valor válido de AnimalState (0, 1, 2). "
+				% [key.trim_suffix("_active_node"), str(fsm_state)]
+				+ "Atribuição direta ao campo sem usar transition_to()?"
 			)

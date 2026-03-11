@@ -12,7 +12,9 @@ const _CATEGORIES: Array = [
 	["plane",        "Plano"],
 	["gravity",      "Gravidade"],
 	["scroller",     "Scroller"],
+	["hole",         "Buraco (hole)"],
 	["sun_moon",     "Sol/Lua (posição)"],
+	["animal_fsm",   "FSM Animal (estado)"],
 ]
 
 var _panel: PanelContainer

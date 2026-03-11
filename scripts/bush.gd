@@ -301,6 +301,13 @@ func try_accept_animal(dropped_animal: Animal) -> bool:
 			"' é compatível com a lista: ", accepted_animal_names if accepted_animal_names.size() > 0 else ["(qualquer)"])
 	elif DebugLogger.drag:
 		print(_tag, " >> ACCEPT")
+	# Garantir que o animal está em IDLE antes de entrar na moita.
+	# FLY/FALL enquanto escondido corromperia o estado FSM.
+	if dropped_animal.get("current_state") != null and dropped_animal.get("current_state") != Animal.AnimalState.IDLE:
+		if dropped_animal.has_method("transition_to"):
+			if DebugLogger.bush:
+				print(_tag, " Forcing IDLE before accept: ", dropped_animal.animal_name)
+			dropped_animal.transition_to(Animal.AnimalState.IDLE)
 	_accept_animal(dropped_animal)
 	return true
 

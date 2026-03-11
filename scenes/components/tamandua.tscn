@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://dymxkx07niar6" path="res://scripts/animal.gd" id="1_tdua1"]
 [ext_resource type="Texture2D" uid="uid://dcbe6e64qx5oy" path="res://assets/animals/tamandua.png" id="2_h2mal"]
+[ext_resource type="Texture2D" uid="uid://dgnl2ppwtjtr0" path="res://assets/animals/sleep.png" id="3_oenvi"]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_tdua3"]
 radius = 43.881187
@@ -10,6 +11,8 @@ height = 323.48264
 [node name="Tamandua" type="Node2D" unique_id=470758225]
 script = ExtResource("1_tdua1")
 animal_name = "Tamandua"
+idle_awake_texture = ExtResource("2_h2mal")
+idle_sleep_texture = ExtResource("3_oenvi")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=542143413]
 texture = ExtResource("2_h2mal")

@@ -188,14 +188,22 @@ func recycle_segment(index: int, new_x: float) -> void:
 		print("[SEGMENT RECYCLE] Destroying scene_index:", old_scene_index, "| animals_outside_bushes:", animals_before.size())
 		for animal in animals_before:
 			print("[SEGMENT RECYCLE ANIMAL] ", animal.name,
-				" | is_falling:", animal.get("is_falling"),
+				" | current_state:", animal.get("current_state"),
 				" | is_being_dragged:", animal.get("is_being_dragged"),
 				" | visible:", animal.visible,
 				" | global_pos:", animal.global_position)
-	
+
 	# Save animal states preserving their WORLD positions
 	var world_manager = get_tree().get_first_node_in_group("world_manager")
 	for animal in animals_before:
+		# Normalizar para IDLE antes de salvar: FLY/FALL são estados transitórios que não devem
+		# ser persistidos. apply_gravity() no restore ativa FLY/FALL de volta, se necessário.
+		if animal.get("current_state") != null and animal.get("current_state") != Animal.AnimalState.IDLE:
+			if animal.has_method("transition_to"):
+				if DebugLogger.scroller:
+					print("[SEGMENT RECYCLE] Normalizando IDLE para ", animal.name,
+						" (estava em state:", animal.get("current_state"), ")")
+				animal.transition_to(Animal.AnimalState.IDLE)
 		if world_manager and world_manager.has_method("save_animal_state_for_recycle"):
 			world_manager.save_animal_state_for_recycle(animal)
 		# Clear active reference so next instance can become active

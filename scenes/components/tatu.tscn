@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://dymxkx07niar6" path="res://scripts/animal.gd" id="1_ajemn"]
 [ext_resource type="Texture2D" uid="uid://c05oyjoyswy4s" path="res://assets/animals/tatu-canastra.png" id="2_4iypf"]
+[ext_resource type="Texture2D" uid="uid://dgnl2ppwtjtr0" path="res://assets/animals/sleep.png" id="3_vbos2"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_vbos2"]
 radius = 80.024994
@@ -11,6 +12,8 @@ script = ExtResource("1_ajemn")
 animal_name = "Tatu"
 is_hidden = null
 can_fly = null
+idle_awake_texture = ExtResource("2_4iypf")
+idle_sleep_texture = ExtResource("3_vbos2")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=920839805]
 texture = ExtResource("2_4iypf")

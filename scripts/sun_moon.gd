@@ -97,7 +97,7 @@ func _process(_delta: float) -> void:
 		if DebugLogger.enabled and DebugLogger.sun_moon:
 			var cam := get_viewport().get_camera_2d()
 			var vp  := get_viewport_rect().size
-			print("[SunMoon] _process: center changed → new_center=%s  animating=%s  cam.pos=%s  cam.zoom=%s  vp=%s" % [new_center, _animating, (cam.global_position if cam else "NO CAM"), (cam.zoom if cam else "NO CAM"), vp])
+			print("[SunMoon] _process: center changed → new_center=%s  animating=%s  cam.pos=%s  cam.zoom=%s  vp=%s" % [new_center, _animating, (str(cam.global_position) if cam else "NO CAM"), (str(cam.zoom) if cam else "NO CAM"), vp])
 
 # ─────────────────────────────────────────────────────────────────────────────
 func _make_icon(path: String, node_name: String, icon_size: Vector2) -> TextureRect:

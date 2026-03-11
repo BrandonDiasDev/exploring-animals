@@ -1,7 +1,9 @@
 [gd_scene format=3 uid="uid://6c0sosp5023h"]
 
 [ext_resource type="Script" uid="uid://dymxkx07niar6" path="res://scripts/animal.gd" id="1_g03ek"]
+[ext_resource type="Texture2D" uid="uid://cxum85mrmutd1" path="res://assets/animals/idle.png" id="2_bahhe"]
 [ext_resource type="Texture2D" uid="uid://d31afe8avo2hb" path="res://assets/animals/seriema.png" id="2_xgv3q"]
+[ext_resource type="Texture2D" uid="uid://dgnl2ppwtjtr0" path="res://assets/animals/sleep.png" id="3_ep3bp"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_ppnnx"]
 size = Vector2(345, 139)
@@ -10,6 +12,8 @@ size = Vector2(345, 139)
 script = ExtResource("1_g03ek")
 animal_name = "Siriema"
 can_fly = true
+idle_awake_texture = ExtResource("2_bahhe")
+idle_sleep_texture = ExtResource("3_ep3bp")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=1278010209]
 texture = ExtResource("2_xgv3q")

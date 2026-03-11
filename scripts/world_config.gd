@@ -78,3 +78,6 @@ extends Node
 ## `true` enquanto for dia; `false` enquanto for noite.
 ## Atualizado por sun_moon.gd no início de cada transição.
 var is_day: bool = true
+
+## Duração padrão de voo (segundos) — fallback quando a cena do animal não sobrescreve fly_duration.
+@export var default_fly_duration: float = 5.0

@@ -1,7 +1,9 @@
 [gd_scene format=3 uid="uid://dgcc6rc7ago21"]
 
 [ext_resource type="Script" uid="uid://dymxkx07niar6" path="res://scripts/animal.gd" id="1_cd57g"]
+[ext_resource type="Texture2D" uid="uid://cxum85mrmutd1" path="res://assets/animals/idle.png" id="2_pxhq8"]
 [ext_resource type="Texture2D" uid="uid://d1d5v8o0mx5u5" path="res://assets/animals/tucano.png" id="2_xcxsq"]
+[ext_resource type="Texture2D" uid="uid://dgnl2ppwtjtr0" path="res://assets/animals/sleep.png" id="3_8sri2"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_c2k5k"]
 size = Vector2(273, 78)
@@ -10,6 +12,8 @@ size = Vector2(273, 78)
 script = ExtResource("1_cd57g")
 animal_name = "Tucano"
 can_fly = true
+idle_awake_texture = ExtResource("2_pxhq8")
+idle_sleep_texture = ExtResource("3_8sri2")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=1278010209]
 texture = ExtResource("2_xcxsq")
