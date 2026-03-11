@@ -96,13 +96,13 @@ func _on_day_night_transition_started(to_day: bool, duration: float) -> void:
 	_notify_all_animals_day_night(to_day)
 
 func _notify_all_animals_day_night(to_day: bool) -> void:
-	"""Propaga a mudança dia/noite para todos os animais com nó ativo na cena."""
-	for key: String in animals_state.keys():
-		if not key.ends_with("_active_node"):
-			continue
-		var node = animals_state[key]
-		if is_instance_valid(node) and node.has_method("notify_day_night_changed"):
-			node.notify_day_night_changed(to_day)
+	"""Propaga a mudança dia/noite para todos os animais na cena.
+	Usa get_nodes_in_group para garantir que animais nativos (sem entrada em animals_state)
+	também recebam a notificação."""
+	var animals = get_tree().get_nodes_in_group("animals")
+	for animal in animals:
+		if is_instance_valid(animal) and animal.has_method("notify_day_night_changed"):
+			animal.notify_day_night_changed(to_day)
 
 func _on_bush_accepted_animal(animal: Animal, bush: Bush):
 	"""Atualiza scene_index, local_position, bush_id e is_hidden do animal.

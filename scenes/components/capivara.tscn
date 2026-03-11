@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://dymxkx07niar6" path="res://scripts/animal.gd" id="1_brawi"]
 [ext_resource type="Texture2D" uid="uid://dmgmjks3cl2aw" path="res://assets/animals/capivara.png" id="2_f1wx2"]
 [ext_resource type="Texture2D" uid="uid://dgnl2ppwtjtr0" path="res://assets/animals/sleep.png" id="3_bejdd"]
+[ext_resource type="Texture2D" uid="uid://4c6rvv18ay2y" path="res://assets/animals/capivara-fall.png" id="4_d0cmc"]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_12o72"]
 radius = 39.809643
@@ -13,6 +14,7 @@ script = ExtResource("1_brawi")
 current_plane = "plane1"
 idle_awake_texture = ExtResource("2_f1wx2")
 idle_sleep_texture = ExtResource("3_bejdd")
+fall_texture = ExtResource("4_d0cmc")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=1460544061]
 texture = ExtResource("2_f1wx2")

@@ -19,6 +19,10 @@ signal animal_drag_ended(animal: Animal)
 @export var idle_awake_texture: Texture2D
 ## Textura do animal dormindo (IDLE + noite). Deixe vazio para não alterar textura à noite.
 @export var idle_sleep_texture: Texture2D
+## Textura do animal voando (FLY). Deixe vazio para manter a textura idle.
+@export var fly_texture: Texture2D
+## Textura do animal caindo (FALL). Deixe vazio para manter a textura idle.
+@export var fall_texture: Texture2D
 ## Duração do voo em segundos antes do pouso automático (só se can_fly=true).
 @export var fly_duration: float = 5.0
 
@@ -38,12 +42,17 @@ var mouse_captured := false
 var current_state: AnimalState = AnimalState.IDLE
 var _fly_timer: float = 0.0
 var fall_tween: Tween = null
+## Textura padrão capturada da cena em _ready(); usada como fallback de IDLE.
+var _default_idle_texture: Texture2D = null
 
 func _ready():
 	add_to_group("animals")
 	
 	area.input_event.connect(_on_area_input_event)
 	original_position = position
+	
+	# Capturar textura padrão da cena antes de qualquer override FSM.
+	_default_idle_texture = sprite.texture
 	
 	if is_hidden:
 		visible = false
@@ -393,10 +402,14 @@ func _enter_state(state: AnimalState) -> void:
 			_update_idle_visual()
 		AnimalState.FLY:
 			_fly_timer = 0.0
+			if fly_texture != null:
+				sprite.texture = fly_texture
 			# Animação de voo (se existir na cena)
 			if animation_player and animation_player.has_animation("fly"):
 				animation_player.play("fly")
 		AnimalState.FALL:
+			if fall_texture != null:
+				sprite.texture = fall_texture
 			_start_fall_tween()
 
 func _update_idle_visual() -> void:
@@ -407,7 +420,9 @@ func _update_idle_visual() -> void:
 		sprite.texture = idle_sleep_texture
 	elif idle_awake_texture != null:
 		sprite.texture = idle_awake_texture
-	# Se ambas forem nulas, mantém a textura atual definida na cena.
+	elif _default_idle_texture != null:
+		# Restaura textura original da cena (garante retorno correto de FLY/FALL).
+		sprite.texture = _default_idle_texture
 	if DebugLogger.animal_fsm:
 		var vis := "sleep" if (is_night and idle_sleep_texture != null) else "awake"
 		print("[FSM] ", animal_name, ": idle_visual = ", vis)

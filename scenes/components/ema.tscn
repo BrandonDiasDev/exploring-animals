@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://dymxkx07niar6" path="res://scripts/animal.gd" id="1_janv7"]
 [ext_resource type="Texture2D" uid="uid://dsbqffw3bw7gx" path="res://assets/animals/ema.png" id="2_dy4fa"]
 [ext_resource type="Texture2D" uid="uid://dgnl2ppwtjtr0" path="res://assets/animals/sleep.png" id="3_45l8g"]
+[ext_resource type="Texture2D" uid="uid://cx47yu4d2tmdy" path="res://assets/animals/ema-fall.png" id="4_n5w6v"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_dy4fa"]
 size = Vector2(176, 234)
@@ -15,6 +16,7 @@ script = ExtResource("1_janv7")
 animal_name = "Ema"
 idle_awake_texture = ExtResource("2_dy4fa")
 idle_sleep_texture = ExtResource("3_45l8g")
+fall_texture = ExtResource("4_n5w6v")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=2095348685]
 texture = ExtResource("2_dy4fa")
