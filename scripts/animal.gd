@@ -154,17 +154,13 @@ func _process(delta):
 			# Verificar novamente se ainda está pressionado
 			if is_pressed and mouse_captured:  # NOVO: Double check
 				start_drag()
-	# Temporizador de voo: pousa automaticamente após fly_duration expirar
+	# Temporizador de voo: gravidade vence após fly_duration → FALL → IDLE
 	if current_state == AnimalState.FLY:
 		_fly_timer += delta
 		if _fly_timer >= fly_duration:
 			if DebugLogger.animal_fsm:
-				print("[FSM] ", animal_name, ": voo expirou (", "%.1f" % _fly_timer, "s) → IDLE")
-			transition_to(AnimalState.IDLE)
-			check_plane_change()
-			var _wm := get_tree().get_first_node_in_group("world_manager")
-			if _wm and _wm.has_method("save_animal_state"):
-				_wm.save_animal_state(self)
+				print("[FSM] ", animal_name, ": voo expirou (", "%.1f" % _fly_timer, "s) → FALL")
+			transition_to(AnimalState.FALL)
 
 func on_click():
 	_cancel_transition()  # Transação cancelada pelo clique; ação normal retoma
@@ -438,14 +434,11 @@ func notify_day_night_changed(_to_day: bool) -> void:
 ## Ponto de entrada para aplicar gravidade/voo após soltar o animal ou revelá-lo.
 ## can_fly=true  → transição para FLY (voo livre com timer).
 ## can_fly=false → transição para FALL se acima da linha de terra.
+## can_fly=true  → transição para FLY se acima da linha de terra.
 ## Retorna true se iniciou uma transição, false se o animal já está em posição final.
 func apply_gravity() -> bool:
 	if is_being_dragged or is_hidden or current_state != AnimalState.IDLE:
 		return false
-
-	if can_fly:
-		transition_to(AnimalState.FLY)
-		return true
 
 	var cfg := get_node_or_null("/root/WorldConfig") as _WorldConfig
 	if not cfg:
@@ -458,7 +451,11 @@ func apply_gravity() -> bool:
 		feet_y += sprite.texture.get_height() / 2.0 * scale.y + FEET_OFFSET_G
 
 	if feet_y >= cfg.background_earth_y:
-		return false  # Já está na terra ou abaixo — sem queda necessária
+		return false  # Já está na terra ou abaixo — sem transição necessária
+
+	if can_fly:
+		transition_to(AnimalState.FLY)
+		return true
 
 	transition_to(AnimalState.FALL)
 	return true

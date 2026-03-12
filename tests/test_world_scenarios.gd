@@ -130,9 +130,10 @@ func run_all() -> void:
 	# ── Grupo 13: FSM Invariants ──────────────────────────────────────────────────
 	await _run("G13-A — animal sempre normalizado para IDLE após transition_to(IDLE)", _g13a_idle_transition)
 	await _run("G13-B — can_fly=false usa FALL, não FLY, ao chamar apply_gravity",     _g13b_no_fly_for_ground_animal)
-	await _run("G13-C — fly_duration curto pousa automaticamente (FLY → IDLE)",        _g13c_fly_duration_lands)
+	await _run("G13-C — fly_duration curto: FLY → FALL → IDLE automaticamente",        _g13c_fly_duration_lands)
 	await _run("G13-D — animal aceito na moita está em IDLE",                          _g13d_hidden_animal_is_idle)
 	await _run("G13-E — notify_day_night_changed atualiza idle_visual em IDLE",        _g13e_day_night_idle_visual)
+	await _run("G13-F — can_fly=true a nível do chão: apply_gravity retorna false (sem FLY)", _g13f_fly_no_fly_at_ground)
 
 	_footer()
 
@@ -1322,18 +1323,34 @@ func _g13c_fly_duration_lands() -> void:
 		dummy.queue_free()
 		_skip_test("animal de teste não tem current_state (FSM não implementado)")
 		return
+	var cfg := get_node_or_null("/root/WorldConfig")
+	if not cfg:
+		dummy.queue_free()
+		_skip_test("WorldConfig não disponível")
+		return
+	# Posicionar no céu para que apply_gravity() acione FLY
+	dummy.position.y = cfg.background_earth_y - 400.0
 	dummy.set("can_fly", true)
 	dummy.set("fly_duration", 0.05)  # 50ms — expira quase instantaneamente
 	dummy.apply_gravity()
 	var state_after_fly: int = dummy.get("current_state")
 	_assert(state_after_fly == 1,
 		"deveria estar em FLY (1) após apply_gravity com can_fly=true, está em: " + str(state_after_fly))
-	# Aguardar tempo suficiente para o fly_duration expirar via _process
-	await get_tree().create_timer(0.20).timeout
+	# Aguardar fly_duration expirar → deve entrar em FALL (não IDLE)
+	await get_tree().create_timer(0.15).timeout
+	var state_after_fly_timer: int = dummy.get("current_state")
+	_assert(state_after_fly_timer == 2,
+		"deveria estar em FALL (2) após fly_duration expirar, está em: " + str(state_after_fly_timer))
+	# Aguardar o tween de queda completar (max 1.2s + buffer)
+	await get_tree().create_timer(1.5).timeout
 	await get_tree().process_frame
-	var state_after_timer: int = dummy.get("current_state")
-	_assert(state_after_timer == 0,
-		"deveria estar em IDLE (0) após fly_duration expirar, está em: " + str(state_after_timer))
+	var state_after_land: int = dummy.get("current_state")
+	_assert(state_after_land == 0,
+		"deveria estar em IDLE (0) após pousar, está em: " + str(state_after_land))
+	# Verificar que pousou na zona de chão
+	var landed_y: float = dummy.global_position.y
+	_assert(landed_y >= cfg.background_earth_y - 10.0,
+		"deveria ter pousado na zona de chão (>= background_earth_y - 10), pousou em y: " + str(landed_y))
 	dummy.queue_free()
 	await get_tree().process_frame
 
@@ -1401,7 +1418,7 @@ func _g13e_day_night_idle_visual() -> void:
 	# Simular transição para FLY e depois mudar dia/noite — textura NÃO deve mudar
 	dummy.set("can_fly", true)
 	dummy.set("fly_duration", 999.0)
-	dummy.apply_gravity()
+	dummy.transition_to(Animal.AnimalState.FLY)
 	if cfg:
 		cfg.is_day = true
 	dummy.notify_day_night_changed(true)
@@ -1413,6 +1430,34 @@ func _g13e_day_night_idle_visual() -> void:
 		cfg.is_day = orig_is_day
 	if dummy.has_method("transition_to"):
 		dummy.transition_to(Animal.AnimalState.IDLE)
+	dummy.queue_free()
+	await get_tree().process_frame
+
+
+# G13-F: can_fly=true a nível do chão não deve entrar em FLY.
+# apply_gravity() deve retornar false e manter IDLE.
+func _g13f_fly_no_fly_at_ground() -> void:
+	var dummy := _instantiate_dummy_animal()
+	if not dummy:
+		_skip_test("não foi possível criar animal de teste")
+		return
+	if dummy.get("current_state") == null:
+		dummy.queue_free()
+		_skip_test("animal de teste não tem current_state (FSM não implementado)")
+		return
+	var cfg := get_node_or_null("/root/WorldConfig")
+	if not cfg:
+		dummy.queue_free()
+		_skip_test("WorldConfig não disponível")
+		return
+	dummy.set("can_fly", true)
+	# Posicionar abaixo da linha de terra — apply_gravity() não deve acionar FLY
+	dummy.position.y = cfg.background_earth_y + 200.0
+	var result: bool = dummy.apply_gravity()
+	_assert(not result,
+		"apply_gravity() deveria retornar false para can_fly=true a nível do chão")
+	_assert(dummy.get("current_state") == 0,
+		"current_state deveria permanecer IDLE (0), está em: " + str(dummy.get("current_state")))
 	dummy.queue_free()
 	await get_tree().process_frame
 
