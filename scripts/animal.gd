@@ -183,7 +183,6 @@ func on_click():
 	emit_signal("animal_clicked", self)
 	play_click_animation()
 	play_sound()
-	zoom_camera()
 
 func start_drag():
 	if is_being_dragged:

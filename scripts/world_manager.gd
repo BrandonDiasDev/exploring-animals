@@ -10,6 +10,7 @@ var is_dragging := false
 var mouse_pressed := false  # Press confirmado, aguardando motion para virar drag
 var last_mouse_pos := Vector2.ZERO
 var is_animal_being_dragged := false
+var is_zooming_to_animal := false
 var can_start_camera_drag := true
 # True quando uma Area2D (animal ou arbusto) capturou o press deste frame.
 # Impede que um motion imediatamente após o press inicie o drag da câmera.
@@ -1110,12 +1111,41 @@ func validate_state(label: String = "") -> bool:
 
 # ─────────────────────────────────────────────────────────────────────────────
 
-func _on_animal_clicked(_animal):
+func _on_animal_clicked(animal):
 	is_dragging = false
 	mouse_pressed = false
 	can_start_camera_drag = false
 	await get_tree().process_frame
 	can_start_camera_drag = true
+	zoom_to_animal(animal)
+
+func zoom_to_animal(animal) -> void:
+	if is_zooming_to_animal:
+		return
+	is_zooming_to_animal = true
+
+	var saved_x := camera_position
+	var saved_y := camera.position.y
+
+	# Pan X via the existing lerp system, pan Y via tween
+	camera_position = animal.global_position.x
+
+	var tween_in = create_tween().set_parallel(true)
+	tween_in.tween_property(camera, "zoom", Vector2(1.5, 1.5), 0.3)
+	tween_in.tween_property(camera, "position:y", animal.global_position.y, 0.3)
+	await tween_in.finished
+
+	await get_tree().create_timer(1.0).timeout
+
+	# Restore original camera position
+	camera_position = saved_x
+
+	var tween_out = create_tween().set_parallel(true)
+	tween_out.tween_property(camera, "zoom", Vector2(1.0, 1.0), 0.3)
+	tween_out.tween_property(camera, "position:y", saved_y, 0.3)
+	await tween_out.finished
+
+	is_zooming_to_animal = false
 
 func _on_animal_drag_started(animal):
 	if DebugLogger.drag: print("[CAM] drag_started:", animal.animal_name, " | is_dragging antes:", is_dragging)
@@ -1156,6 +1186,8 @@ func _input(event):
 			is_dragging = false
 
 func _unhandled_input(event):
+	if is_zooming_to_animal:
+		return
 	if is_animal_being_dragged:
 		if mouse_pressed or is_dragging:
 			if DebugLogger.drag: print("[WM _unhandled] animal dragging -> reset cam state")

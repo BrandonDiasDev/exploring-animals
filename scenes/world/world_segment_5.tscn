@@ -4,6 +4,7 @@
 [ext_resource type="PackedScene" uid="uid://cqhdx5be3cbc5" path="res://scenes/components/tatu.tscn" id="2_nwjd1"]
 [ext_resource type="PackedScene" uid="uid://c56qu60hhfqpm" path="res://scenes/components/hole01.tscn" id="2_y6e17"]
 [ext_resource type="Texture2D" uid="uid://ypqcmr78lvgq" path="res://assets/backgrounds/5-night.png" id="3_1pw8d"]
+[ext_resource type="PackedScene" uid="uid://boguhln66xixy" path="res://scenes/components/lobo.tscn" id="4_1pw8d"]
 [ext_resource type="Script" uid="uid://chjdudqckkvp" path="res://scripts/world_segment.gd" id="seg_script"]
 
 [node name="WorldSegment" type="Node2D" unique_id=817559777]
@@ -21,6 +22,9 @@ texture = ExtResource("3_1pw8d")
 
 [node name="Plane2" type="Node2D" parent="." unique_id=572081845]
 z_as_relative = false
+
+[node name="Lobo" parent="Plane2" unique_id=342004318 instance=ExtResource("4_1pw8d")]
+position = Vector2(-806, 50)
 
 [node name="Tatu" parent="Plane2" unique_id=471309178 instance=ExtResource("2_nwjd1")]
 position = Vector2(330, -113)
