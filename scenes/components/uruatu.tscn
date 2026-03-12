@@ -16,6 +16,7 @@ current_plane = "plane1"
 can_fly = true
 idle_awake_texture = ExtResource("2_fwvl0")
 idle_sleep_texture = ExtResource("3_eso8s")
+sleeps_at_night = false
 fly_texture = ExtResource("4_j2kew")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=1278010209]

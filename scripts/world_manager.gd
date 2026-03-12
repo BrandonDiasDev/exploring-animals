@@ -695,6 +695,8 @@ func extract_animal_from_bush(animal: Animal, segment: Node2D, state: Dictionary
 		animal.z_index = 200
 	if animal.has_method("_sync_visual_to_plane"):
 		animal._sync_visual_to_plane()
+	if animal.has_method("notify_day_night_changed"):
+		animal.notify_day_night_changed(WorldConfig.is_day)
 	
 	# Enable Area2D monitoring so drag works
 	if animal.has_node("Area2D"):
@@ -806,6 +808,8 @@ func create_animal_in_segment(segment: Node2D, animal_id: String, state: Diction
 	# Sync visual after setting plane and z_index
 	if animal.has_method("_sync_visual_to_plane"):
 		animal._sync_visual_to_plane()
+	if animal.has_method("notify_day_night_changed"):
+		animal.notify_day_night_changed(WorldConfig.is_day)
 
 	# Mark as active usando o animal_id atual (já corrigido se houve rename)
 	var active_key := animal_id + "_active_node"
@@ -942,6 +946,8 @@ func restore_animal_state(animal):
 		
 		if animal.has_method("_sync_visual_to_plane"):
 			animal._sync_visual_to_plane()
+		if animal.has_method("notify_day_night_changed"):
+			animal.notify_day_night_changed(WorldConfig.is_day)
 		
 		reconnect_animal_signals(animal)
 		
@@ -985,6 +991,8 @@ func restore_animal_state(animal):
 				animal.z_index = 200
 			animals_state[animal_id + "_active_node"] = animal
 			reconnect_animal_signals(animal)
+			if animal.has_method("notify_day_night_changed"):
+				animal.notify_day_night_changed(WorldConfig.is_day)
 			# Verificar gravidade para animal inicial (pode estar acima da terra na cena).
 			if animal.has_method("apply_gravity"):
 				animal.apply_gravity()

@@ -19,6 +19,8 @@ signal animal_drag_ended(animal: Animal)
 @export var idle_awake_texture: Texture2D
 ## Textura do animal dormindo (IDLE + noite). Deixe vazio para não alterar textura à noite.
 @export var idle_sleep_texture: Texture2D
+## Se verdadeiro (padrão), o animal dorme à noite. Se falso, dorme de dia (animal noturno).
+@export var sleeps_at_night: bool = true
 ## Textura do animal voando (FLY). Deixe vazio para manter a textura idle.
 @export var fly_texture: Texture2D
 ## Textura do animal caindo (FALL). Deixe vazio para manter a textura idle.
@@ -412,7 +414,10 @@ func _update_idle_visual() -> void:
 	"""Atualiza a textura do Sprite2D com base no estado dia/noite atual."""
 	var cfg := get_node_or_null("/root/WorldConfig") as _WorldConfig
 	var is_night := (cfg != null and not cfg.is_day)
-	if is_night and idle_sleep_texture != null:
+	# should_sleep=true quando o ciclo atual corresponde ao período de sono do animal:
+	# diurno (sleeps_at_night=true) dorme à noite; noturno (sleeps_at_night=false) dorme de dia.
+	var should_sleep := (is_night == sleeps_at_night)
+	if should_sleep and idle_sleep_texture != null:
 		sprite.texture = idle_sleep_texture
 	elif idle_awake_texture != null:
 		sprite.texture = idle_awake_texture
@@ -420,7 +425,7 @@ func _update_idle_visual() -> void:
 		# Restaura textura original da cena (garante retorno correto de FLY/FALL).
 		sprite.texture = _default_idle_texture
 	if DebugLogger.animal_fsm:
-		var vis := "sleep" if (is_night and idle_sleep_texture != null) else "awake"
+		var vis := "sleep" if (should_sleep and idle_sleep_texture != null) else "awake"
 		print("[FSM] ", animal_name, ": idle_visual = ", vis)
 
 ## Chamado pelo WorldManager quando o ciclo dia/noite muda.
