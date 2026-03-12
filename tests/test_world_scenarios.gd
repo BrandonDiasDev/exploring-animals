@@ -135,6 +135,10 @@ func run_all() -> void:
 	await _run("G13-E — notify_day_night_changed atualiza idle_visual em IDLE",        _g13e_day_night_idle_visual)
 	await _run("G13-F — can_fly=true a nível do chão: apply_gravity retorna false (sem FLY)", _g13f_fly_no_fly_at_ground)
 
+	# ── Grupo 14: Sleep Disturbance ───────────────────────────────────────────────
+	await _run("G14-A — clique acorda animal dormindo (is_temporarily_awake)",  _g14a_click_wakes_sleeping)
+	await _run("G14-B — wake_duration expirado retorna textura de sono",          _g14b_wake_timer_expires)
+
 	_footer()
 
 
@@ -1347,10 +1351,10 @@ func _g13c_fly_duration_lands() -> void:
 	var state_after_land: int = dummy.get("current_state")
 	_assert(state_after_land == 0,
 		"deveria estar em IDLE (0) após pousar, está em: " + str(state_after_land))
-	# Verificar que pousou na zona de chão
-	var landed_y: float = dummy.global_position.y
-	_assert(landed_y >= cfg.background_earth_y - 10.0,
-		"deveria ter pousado na zona de chão (>= background_earth_y - 10), pousou em y: " + str(landed_y))
+	# Verificar que pousou na zona de chão (comparar pés, não âncora do sprite)
+	var landed_feet_y: float = dummy.get_feet_y()
+	_assert(landed_feet_y >= cfg.background_earth_y - 10.0,
+		"deveria ter pousado na zona de chão (>= background_earth_y - 10), pés em y: " + str(landed_feet_y))
 	dummy.queue_free()
 	await get_tree().process_frame
 
@@ -1458,6 +1462,92 @@ func _g13f_fly_no_fly_at_ground() -> void:
 		"apply_gravity() deveria retornar false para can_fly=true a nível do chão")
 	_assert(dummy.get("current_state") == 0,
 		"current_state deveria permanecer IDLE (0), está em: " + str(dummy.get("current_state")))
+	dummy.queue_free()
+	await get_tree().process_frame
+
+
+# G14-A: clicar num animal dormindo deve definir is_temporarily_awake=true e mostrar textura acordado.
+func _g14a_click_wakes_sleeping() -> void:
+	var dummy := _instantiate_dummy_animal()
+	if not dummy:
+		_skip_test("não foi possível criar animal de teste")
+		return
+	if dummy.get("is_temporarily_awake") == null:
+		dummy.queue_free()
+		_skip_test("animal de teste não tem is_temporarily_awake (não implementado)")
+		return
+	var cfg := get_node_or_null("/root/WorldConfig")
+	var orig_is_day: bool = cfg.is_day if cfg else true
+	# Criar texturas distintas para sono e vigília
+	var sleep_tex := ImageTexture.new()
+	var awake_tex := ImageTexture.new()
+	dummy.set("idle_sleep_texture", sleep_tex)
+	dummy.set("idle_awake_texture", awake_tex)
+	# Colocar em noite para ativar sono
+	if cfg:
+		cfg.is_day = false
+	# Garantir IDLE com visual de sono.
+	# transition_to(IDLE) é no-op se o animal já estiver em IDLE, por isso
+	# chamamos notify_day_night_changed para forçar a atualização do visual.
+	if dummy.has_method("transition_to"):
+		dummy.transition_to(Animal.AnimalState.IDLE)
+	if dummy.has_method("notify_day_night_changed"):
+		dummy.notify_day_night_changed(false)
+	var sprite := dummy.get_node_or_null("Sprite2D")
+	_assert(sprite != null and sprite.texture == sleep_tex,
+		"antes do clique deveria mostrar sleep_tex à noite")
+	# Simular clique
+	if dummy.has_method("on_click"):
+		dummy.on_click()
+	_assert(dummy.get("is_temporarily_awake") == true,
+		"is_temporarily_awake deveria ser true após on_click()")
+	_assert(sprite != null and sprite.texture == awake_tex,
+		"após clique deveria mostrar awake_tex mesmo à noite")
+	# Restaurar
+	if cfg:
+		cfg.is_day = orig_is_day
+	dummy.queue_free()
+	await get_tree().process_frame
+
+
+# G14-B: após wake_duration expirar, animal volta para textura de sono automaticamente.
+func _g14b_wake_timer_expires() -> void:
+	var dummy := _instantiate_dummy_animal()
+	if not dummy:
+		_skip_test("não foi possível criar animal de teste")
+		return
+	if dummy.get("is_temporarily_awake") == null:
+		dummy.queue_free()
+		_skip_test("animal de teste não tem is_temporarily_awake (não implementado)")
+		return
+	var cfg := get_node_or_null("/root/WorldConfig")
+	var orig_is_day: bool = cfg.is_day if cfg else true
+	# Criar texturas distintas para sono e vigília
+	var sleep_tex := ImageTexture.new()
+	var awake_tex := ImageTexture.new()
+	dummy.set("idle_sleep_texture", sleep_tex)
+	dummy.set("idle_awake_texture", awake_tex)
+	dummy.set("wake_duration", 0.05)
+	# Colocar em noite
+	if cfg:
+		cfg.is_day = false
+	if dummy.has_method("transition_to"):
+		dummy.transition_to(Animal.AnimalState.IDLE)
+	# Perturbar
+	if dummy.has_method("_disturbance_wake"):
+		dummy._disturbance_wake()
+	var sprite := dummy.get_node_or_null("Sprite2D")
+	_assert(sprite != null and sprite.texture == awake_tex,
+		"imediatamente após _disturbance_wake() deveria mostrar awake_tex")
+	# Aguardar expirar (0.05s + buffer)
+	await get_tree().create_timer(0.20).timeout
+	_assert(dummy.get("is_temporarily_awake") == false,
+		"is_temporarily_awake deveria ser false após wake_duration expirar")
+	_assert(sprite != null and sprite.texture == sleep_tex,
+		"após wake_duration deveria voltar para sleep_tex")
+	# Restaurar
+	if cfg:
+		cfg.is_day = orig_is_day
 	dummy.queue_free()
 	await get_tree().process_frame
 

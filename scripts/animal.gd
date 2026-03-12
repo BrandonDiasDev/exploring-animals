@@ -46,6 +46,11 @@ var _fly_timer: float = 0.0
 var fall_tween: Tween = null
 ## Textura padrão capturada da cena em _ready(); usada como fallback de IDLE.
 var _default_idle_texture: Texture2D = null
+## Duração em segundos que o animal permanece acordado após ser perturbado (durante o período de sono).
+@export var wake_duration: float = 5.0
+## True enquanto o timer de despertar por perturbação está ativo.
+var is_temporarily_awake: bool = false
+var _wake_timer: float = 0.0
 
 func _ready():
 	add_to_group("animals")
@@ -163,9 +168,18 @@ func _process(delta):
 			if DebugLogger.animal_fsm:
 				print("[FSM] ", animal_name, ": voo expirou (", "%.1f" % _fly_timer, "s) → FALL")
 			transition_to(AnimalState.FALL)
+	# Temporizador de despertar: retorna à textura de sono após wake_duration
+	if is_temporarily_awake:
+		_wake_timer += delta
+		if _wake_timer >= wake_duration:
+			is_temporarily_awake = false
+			_wake_timer = 0.0
+			if current_state == AnimalState.IDLE:
+				_update_idle_visual()
 
 func on_click():
 	_cancel_transition()  # Transação cancelada pelo clique; ação normal retoma
+	_disturbance_wake()   # Perturbar acorda o animal se estiver dormindo
 	emit_signal("animal_clicked", self)
 	play_click_animation()
 	play_sound()
@@ -382,6 +396,8 @@ func transition_to(new_state: AnimalState) -> void:
 	_exit_state(old_state)
 	current_state = new_state
 	_enter_state(new_state)
+	if new_state == AnimalState.FALL or new_state == AnimalState.FLY:
+		_disturbance_wake()
 
 func _exit_state(state: AnimalState) -> void:
 	match state:
@@ -416,7 +432,8 @@ func _update_idle_visual() -> void:
 	var is_night := (cfg != null and not cfg.is_day)
 	# should_sleep=true quando o ciclo atual corresponde ao período de sono do animal:
 	# diurno (sleeps_at_night=true) dorme à noite; noturno (sleeps_at_night=false) dorme de dia.
-	var should_sleep := (is_night == sleeps_at_night)
+	# is_temporarily_awake=true quando perturbado — suprime o sono temporariamente.
+	var should_sleep := (is_night == sleeps_at_night) and not is_temporarily_awake
 	if should_sleep and idle_sleep_texture != null:
 		sprite.texture = idle_sleep_texture
 	elif idle_awake_texture != null:
@@ -434,7 +451,26 @@ func notify_day_night_changed(_to_day: bool) -> void:
 	if current_state == AnimalState.IDLE:
 		_update_idle_visual()
 
+## Marca o animal como temporariamente acordado (perturbado durante o período de sono).
+## Reseta o timer para que wake_duration seja contado do momento da perturbação.
+func _disturbance_wake() -> void:
+	is_temporarily_awake = true
+	_wake_timer = 0.0
+	if current_state == AnimalState.IDLE:
+		_update_idle_visual()
+	if DebugLogger.animal_fsm:
+		print("[FSM] ", animal_name, ": acordou (perturbado)")
+
 # ── Gravidade ─────────────────────────────────────────────────────────────────
+
+## Retorna a posição Y dos pés do animal em coordenadas globais.
+## Usa o mesmo cálculo de apply_gravity() e _start_fall_tween().
+func get_feet_y() -> float:
+	const FEET_OFFSET := 20.0
+	var fy := global_position.y
+	if sprite and sprite.texture:
+		fy += sprite.texture.get_height() / 2.0 * scale.y + FEET_OFFSET
+	return fy
 
 ## Ponto de entrada para aplicar gravidade/voo após soltar o animal ou revelá-lo.
 ## can_fly=true  → transição para FLY (voo livre com timer).
@@ -477,8 +513,8 @@ func _start_fall_tween() -> void:
 	if sprite and sprite.texture:
 		feet_y += sprite.texture.get_height() / 2.0 * scale.y + FEET_OFFSET_G
 
-	# Destino: pés pousam em Y aleatório entre background_earth_y e o centro (0)
-	var target_feet_y := randf_range(cfg.background_earth_y, 0.0)
+	# Destino: pés pousam na linha de terra (background_earth_y)
+	var target_feet_y := cfg.background_earth_y
 	var feet_offset_val: float = 0.0
 	if sprite and sprite.texture:
 		feet_offset_val = sprite.texture.get_height() / 2.0 * scale.y + FEET_OFFSET_G
@@ -521,7 +557,19 @@ func _on_fall_finished():
 	fall_tween = null
 	if DebugLogger.gravity: print("[GRAVITY LAND] ", animal_name, " pousou em y:", "%.0f" % global_position.y)
 	transition_to(AnimalState.IDLE)
+	# check_plane_change() deve rodar antes do snap de posição porque pode mudar
+	# scale e reparentar o nó — o snap precisa usar a scale e o parent finais.
 	check_plane_change()
+	# A textura muda ao entrar em IDLE (idle vs fall podem ter alturas diferentes) e
+	# check_plane_change() pode ter alterado scale. Recalcular position.y agora que
+	# ambos estão estabilizados para que os pés fiquem exatamente em background_earth_y.
+	var cfg_land := get_node_or_null("/root/WorldConfig") as _WorldConfig
+	if cfg_land and sprite and sprite.texture:
+		const FEET_OFFSET_LAND := 20.0
+		var feet_offset_val := sprite.texture.get_height() / 2.0 * scale.y + FEET_OFFSET_LAND
+		var parent_node_land := get_parent() as Node2D
+		var parent_global_y_land: float = parent_node_land.global_position.y if parent_node_land else 0.0
+		position.y = cfg_land.background_earth_y - feet_offset_val - parent_global_y_land
 	var world_manager := get_tree().get_first_node_in_group("world_manager")
 	if world_manager and world_manager.has_method("save_animal_state"):
 		world_manager.save_animal_state(self)
