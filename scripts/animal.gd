@@ -426,23 +426,43 @@ func _enter_state(state: AnimalState) -> void:
 			_start_fall_tween()
 
 func _update_idle_visual() -> void:
-	"""Atualiza a textura do Sprite2D com base no estado dia/noite atual."""
+	"""Atualiza a textura do Sprite2D com base no estado dia/noite atual.
+	Mantém os pés alinhados ao trocar texturas de alturas diferentes."""
+	if not sprite:
+		return
+
+	# Preservar alinhamento de pés ao trocar de textura (awake <-> sleep).
+	var feet_y_before: float = get_feet_y()
+
 	var cfg := get_node_or_null("/root/WorldConfig") as _WorldConfig
 	var is_night := (cfg != null and not cfg.is_day)
 	# should_sleep=true quando o ciclo atual corresponde ao período de sono do animal:
 	# diurno (sleeps_at_night=true) dorme à noite; noturno (sleeps_at_night=false) dorme de dia.
 	# is_temporarily_awake=true quando perturbado — suprime o sono temporariamente.
 	var should_sleep := (is_night == sleeps_at_night) and not is_temporarily_awake
+	var next_texture: Texture2D = null
 	if should_sleep and idle_sleep_texture != null:
-		sprite.texture = idle_sleep_texture
+		next_texture = idle_sleep_texture
 	elif idle_awake_texture != null:
-		sprite.texture = idle_awake_texture
+		next_texture = idle_awake_texture
 	elif _default_idle_texture != null:
 		# Restaura textura original da cena (garante retorno correto de FLY/FALL).
-		sprite.texture = _default_idle_texture
+		next_texture = _default_idle_texture
+
+	if next_texture == null:
+		return
+
+	sprite.texture = next_texture
+
+	var feet_offset_after: float = _get_feet_offset_for_texture(sprite.texture)
+	var target_global_y: float = feet_y_before - feet_offset_after
+	var parent_node := get_parent() as Node2D
+	var parent_global_y: float = parent_node.global_position.y if parent_node else 0.0
+	position.y = target_global_y - parent_global_y
+
 	if DebugLogger.animal_fsm:
 		var vis := "sleep" if (should_sleep and idle_sleep_texture != null) else "awake"
-		print("[FSM] ", animal_name, ": idle_visual = ", vis)
+		print("[FSM] ", animal_name, ": idle_visual = ", vis, " | feet_y:", " %.0f" % feet_y_before, " ->", " %.0f" % get_feet_y())
 
 ## Chamado pelo WorldManager quando o ciclo dia/noite muda.
 ## Só atua em estado IDLE — FLY e FALL não alteram textura.
@@ -464,11 +484,16 @@ func _disturbance_wake() -> void:
 
 ## Retorna a posição Y dos pés do animal em coordenadas globais.
 ## Usa o mesmo cálculo de apply_gravity() e _start_fall_tween().
-func get_feet_y() -> float:
+func _get_feet_offset_for_texture(tex: Texture2D) -> float:
 	const FEET_OFFSET := 20.0
+	if tex:
+		return tex.get_height() / 2.0 * scale.y + FEET_OFFSET
+	return 0.0
+
+func get_feet_y() -> float:
 	var fy := global_position.y
 	if sprite and sprite.texture:
-		fy += sprite.texture.get_height() / 2.0 * scale.y + FEET_OFFSET
+		fy += _get_feet_offset_for_texture(sprite.texture)
 	return fy
 
 ## Ponto de entrada para aplicar gravidade/voo após soltar o animal ou revelá-lo.
