@@ -31,6 +31,8 @@ var _pass := 0
 var _fail := 0
 var _skip := 0
 
+const GROUND_EPSILON := 3.0
+
 
 # ── Lifecycle ─────────────────────────────────────────────────────────────────
 
@@ -138,6 +140,13 @@ func run_all() -> void:
 	# ── Grupo 14: Sleep Disturbance ───────────────────────────────────────────────
 	await _run("G14-A — clique acorda animal dormindo (is_temporarily_awake)",  _g14a_click_wakes_sleeping)
 	await _run("G14-B — wake_duration expirado retorna textura de sono",          _g14b_wake_timer_expires)
+
+	# ── Grupo 15: Regressão textura-altura + recycle/restore ─────────────────────
+	await _run("G15-A — swap awake→sleep no chão mantém pés alinhados",            _g15a_grounded_texture_swap_keeps_feet)
+	await _run("G15-B — recycle/restore não auto-dispara FLY após sleep",          _g15b_recycle_restore_no_unintended_fly)
+	await _run("G15-C — caso Siriema (378→208) não volta voando",                  _g15c_siriema_height_regression)
+	await _run("G15-D — acima do chão ainda dispara transição válida",             _g15d_negative_control_above_ground)
+	await _run("G15-E — notify dia/noite + recycle preserva IDLE no chão",         _g15e_day_night_notify_then_recycle)
 
 	_footer()
 
@@ -1552,7 +1561,331 @@ func _g14b_wake_timer_expires() -> void:
 	await get_tree().process_frame
 
 
+# ── Grupo 15: Regressão textura-altura + recycle/restore ─────────────────────
+
+# G15-A: trocar textura (awake alto -> sleep baixo) enquanto no chão deve manter os pés alinhados.
+func _g15a_grounded_texture_swap_keeps_feet() -> void:
+	var dummy := _instantiate_dummy_animal("__test_g15a__")
+	if not dummy:
+		_skip_test("não foi possível criar animal de teste")
+		return
+	var cfg := get_node_or_null("/root/WorldConfig")
+	if not cfg:
+		dummy.queue_free()
+		_skip_test("WorldConfig não disponível")
+		return
+
+	var awake_tex := _create_colored_texture(200, 378, Color(1.0, 0.8, 0.2, 1.0))
+	var sleep_tex := _create_colored_texture(200, 208, Color(0.2, 0.6, 1.0, 1.0))
+
+	dummy.idle_awake_texture = awake_tex
+	dummy.idle_sleep_texture = sleep_tex
+	dummy.sleeps_at_night = true
+	dummy.is_temporarily_awake = false
+	dummy.current_state = Animal.AnimalState.IDLE
+
+	var orig_is_day: bool = cfg.is_day
+	cfg.is_day = true
+	dummy.notify_day_night_changed(true)
+	var snapped_ok := _snap_animal_feet_to_ground(dummy, cfg.background_earth_y)
+	_assert(snapped_ok, "pré-condição: não foi possível snapar pés no chão")
+
+	var feet_day: float = dummy.get_feet_y()
+	_assert(absf(feet_day - cfg.background_earth_y) <= GROUND_EPSILON,
+		"pré-condição falhou: pés no dia desalinhados (feet=%.2f, ground=%.2f)" % [feet_day, cfg.background_earth_y])
+
+	cfg.is_day = false
+	dummy.notify_day_night_changed(false)
+	var feet_night: float = dummy.get_feet_y()
+	_assert(absf(feet_night - cfg.background_earth_y) <= GROUND_EPSILON,
+		"após swap para sleep, pés deveriam permanecer alinhados (feet=%.2f, ground=%.2f)" % [feet_night, cfg.background_earth_y])
+
+	# Mesmo com can_fly=true, estando no chão apply_gravity não deve transicionar.
+	dummy.can_fly = true
+	var gravity_result: bool = dummy.apply_gravity()
+	_assert(not gravity_result, "apply_gravity não deveria iniciar transição com pés no chão")
+	_assert(dummy.current_state == Animal.AnimalState.IDLE,
+		"estado deveria permanecer IDLE, atual=%s" % str(dummy.current_state))
+
+	cfg.is_day = orig_is_day
+	dummy.queue_free()
+	await get_tree().process_frame
+
+
+# G15-B: após recycle/restore com textura sleep mais baixa, animal não deve voltar em FLY.
+func _g15b_recycle_restore_no_unintended_fly() -> void:
+	var animal := _find_free_flying_animal()
+	if not animal:
+		_skip_test("nenhum animal livre com can_fly=true disponível")
+		return
+	var cfg := get_node_or_null("/root/WorldConfig")
+	if not cfg:
+		_skip_test("WorldConfig não disponível")
+		return
+
+	var aid: String = _wm.get_animal_unique_id(animal)
+	var orig_is_day: bool = cfg.is_day
+	var old_awake = animal.idle_awake_texture
+	var old_sleep = animal.idle_sleep_texture
+	var old_sleeps: bool = animal.sleeps_at_night
+	var old_can_fly: bool = animal.can_fly
+
+	var awake_tex := _create_colored_texture(180, 360, Color(0.9, 0.9, 0.2, 1.0))
+	var sleep_tex := _create_colored_texture(180, 200, Color(0.3, 0.5, 1.0, 1.0))
+
+	animal.transition_to(Animal.AnimalState.IDLE)
+	animal.idle_awake_texture = awake_tex
+	animal.idle_sleep_texture = sleep_tex
+	animal.sleeps_at_night = true
+	animal.is_temporarily_awake = false
+	animal.can_fly = true
+
+	cfg.is_day = true
+	animal.notify_day_night_changed(true)
+	var snapped_ok := _snap_animal_feet_to_ground(animal, cfg.background_earth_y)
+	_assert(snapped_ok, "pré-condição: falha ao snapar no chão")
+
+	# Entrar em sleep sem ajustar posição manualmente — reproduz caminho real.
+	cfg.is_day = false
+	animal.notify_day_night_changed(false)
+	_wm.save_animal_state(animal)
+
+	var recycled := await _recycle_segment_containing_animal(animal)
+	_assert(recycled, "não foi possível reciclar segmento do animal")
+
+	var restored := _find_active_animal_by_id(aid)
+	_assert(restored != null, "animal restaurado não encontrado para id '%s'" % aid)
+	if restored:
+		_assert(restored.current_state != Animal.AnimalState.FLY,
+			"regressão: restore/apply_gravity não deve colocar animal em FLY sem interação")
+		_assert(restored.current_state == Animal.AnimalState.IDLE,
+			"animal restaurado deveria permanecer IDLE no chão, atual=%s" % str(restored.current_state))
+		var feet_restored: float = restored.get_feet_y()
+		_assert(absf(feet_restored - cfg.background_earth_y) <= GROUND_EPSILON,
+			"pés após restore desalinhados (feet=%.2f, ground=%.2f)" % [feet_restored, cfg.background_earth_y])
+
+	# Restaurar propriedades (no nó ativo atual).
+	if restored:
+		restored.idle_awake_texture = old_awake
+		restored.idle_sleep_texture = old_sleep
+		restored.sleeps_at_night = old_sleeps
+		restored.can_fly = old_can_fly
+		restored.notify_day_night_changed(orig_is_day)
+	cfg.is_day = orig_is_day
+
+
+# G15-C: regressão específica Siriema (altura awake 378 -> sleep 208) não deve auto-voar.
+func _g15c_siriema_height_regression() -> void:
+	var animal := _find_free_flying_animal()
+	if not animal:
+		_skip_test("nenhum animal livre com can_fly=true disponível")
+		return
+	var cfg := get_node_or_null("/root/WorldConfig")
+	if not cfg:
+		_skip_test("WorldConfig não disponível")
+		return
+
+	var aid: String = _wm.get_animal_unique_id(animal)
+	var orig_is_day: bool = cfg.is_day
+	var old_awake = animal.idle_awake_texture
+	var old_sleep = animal.idle_sleep_texture
+	var old_sleeps: bool = animal.sleeps_at_night
+
+	var awake_tex := _create_colored_texture(220, 378, Color(0.9, 0.7, 0.3, 1.0))
+	var sleep_tex := _create_colored_texture(220, 208, Color(0.4, 0.4, 0.9, 1.0))
+
+	animal.transition_to(Animal.AnimalState.IDLE)
+	animal.idle_awake_texture = awake_tex
+	animal.idle_sleep_texture = sleep_tex
+	animal.sleeps_at_night = true
+	animal.is_temporarily_awake = false
+	animal.can_fly = true
+
+	cfg.is_day = true
+	animal.notify_day_night_changed(true)
+	var snapped_ok := _snap_animal_feet_to_ground(animal, cfg.background_earth_y)
+	_assert(snapped_ok, "pré-condição: falha ao snapar no chão")
+
+	# Sequência da regressão: dormir e depois recycle/restore.
+	cfg.is_day = false
+	animal.notify_day_night_changed(false)
+	_wm.save_animal_state(animal)
+	var recycled := await _recycle_segment_containing_animal(animal)
+	_assert(recycled, "não foi possível reciclar segmento do caso Siriema")
+
+	var restored := _find_active_animal_by_id(aid)
+	_assert(restored != null, "animal restaurado não encontrado para id '%s'" % aid)
+	if restored:
+		_assert(restored.current_state == Animal.AnimalState.IDLE,
+			"caso Siriema: esperado IDLE após restore, atual=%s" % str(restored.current_state))
+		_assert(restored.current_state != Animal.AnimalState.FLY,
+			"caso Siriema: não deveria voltar voando sem interação")
+
+	if restored:
+		restored.idle_awake_texture = old_awake
+		restored.idle_sleep_texture = old_sleep
+		restored.sleeps_at_night = old_sleeps
+		restored.notify_day_night_changed(orig_is_day)
+	cfg.is_day = orig_is_day
+
+
+# G15-D: controle negativo — estando genuinamente acima do chão, gravidade deve acionar transição.
+func _g15d_negative_control_above_ground() -> void:
+	var dummy := _instantiate_dummy_animal("__test_g15d__")
+	if not dummy:
+		_skip_test("não foi possível criar animal de teste")
+		return
+	var cfg := get_node_or_null("/root/WorldConfig")
+	if not cfg:
+		dummy.queue_free()
+		_skip_test("WorldConfig não disponível")
+		return
+
+	dummy.transition_to(Animal.AnimalState.IDLE)
+	dummy.can_fly = true
+	dummy.global_position.y = cfg.background_earth_y - 400.0
+	var result_fly: bool = dummy.apply_gravity()
+	_assert(result_fly, "acima do chão, apply_gravity deveria iniciar transição")
+	_assert(dummy.current_state == Animal.AnimalState.FLY,
+		"can_fly=true acima do chão deveria entrar em FLY")
+
+	dummy.transition_to(Animal.AnimalState.IDLE)
+	dummy.can_fly = false
+	dummy.global_position.y = cfg.background_earth_y - 400.0
+	var result_fall: bool = dummy.apply_gravity()
+	_assert(result_fall, "acima do chão, apply_gravity deveria iniciar transição")
+	_assert(dummy.current_state == Animal.AnimalState.FALL,
+		"can_fly=false acima do chão deveria entrar em FALL")
+
+	dummy.transition_to(Animal.AnimalState.IDLE)
+	dummy.queue_free()
+	await get_tree().process_frame
+
+
+# G15-E: notify_day_night_changed (swap de textura) + recycle deve preservar invariantes no restore.
+func _g15e_day_night_notify_then_recycle() -> void:
+	var animal := _find_free_flying_animal()
+	if not animal:
+		_skip_test("nenhum animal livre com can_fly=true disponível")
+		return
+	var cfg := get_node_or_null("/root/WorldConfig")
+	if not cfg:
+		_skip_test("WorldConfig não disponível")
+		return
+
+	var aid: String = _wm.get_animal_unique_id(animal)
+	var orig_is_day: bool = cfg.is_day
+	var old_awake = animal.idle_awake_texture
+	var old_sleep = animal.idle_sleep_texture
+	var old_sleeps: bool = animal.sleeps_at_night
+
+	var awake_tex := _create_colored_texture(160, 300, Color(0.8, 0.9, 0.3, 1.0))
+	var sleep_tex := _create_colored_texture(160, 180, Color(0.3, 0.4, 0.9, 1.0))
+
+	animal.transition_to(Animal.AnimalState.IDLE)
+	animal.idle_awake_texture = awake_tex
+	animal.idle_sleep_texture = sleep_tex
+	animal.sleeps_at_night = true
+	animal.is_temporarily_awake = false
+	animal.can_fly = true
+
+	cfg.is_day = true
+	animal.notify_day_night_changed(true)
+	var snapped_ok := _snap_animal_feet_to_ground(animal, cfg.background_earth_y)
+	_assert(snapped_ok, "pré-condição: falha ao snapar no chão")
+
+	# Trocar ciclo via notify (caminho oficial do WM)
+	cfg.is_day = false
+	animal.notify_day_night_changed(false)
+	_wm.save_animal_state(animal)
+
+	var recycled := await _recycle_segment_containing_animal(animal)
+	_assert(recycled, "não foi possível reciclar segmento")
+
+	var restored := _find_active_animal_by_id(aid)
+	_assert(restored != null, "animal restaurado não encontrado para id '%s'" % aid)
+	if restored:
+		var sprite := restored.get_node_or_null("Sprite2D")
+		_assert(sprite != null and sprite.texture == sleep_tex,
+			"restore deveria preservar visual sleep no ciclo noturno")
+		_assert(restored.current_state == Animal.AnimalState.IDLE,
+			"após notify+recycle, estado esperado é IDLE")
+		_assert(restored.current_state != Animal.AnimalState.FLY,
+			"não deve entrar em FLY sem interação do usuário")
+
+	if restored:
+		restored.idle_awake_texture = old_awake
+		restored.idle_sleep_texture = old_sleep
+		restored.sleeps_at_night = old_sleeps
+		restored.notify_day_night_changed(orig_is_day)
+	cfg.is_day = orig_is_day
+
+
 # ── Helpers de busca ──────────────────────────────────────────────────────────
+
+func _create_colored_texture(width: int, height: int, color: Color) -> Texture2D:
+	var img := Image.create(width, height, false, Image.FORMAT_RGBA8)
+	img.fill(color)
+	return ImageTexture.create_from_image(img)
+
+
+func _snap_animal_feet_to_ground(animal: Node, ground_y: float) -> bool:
+	if not animal:
+		return false
+	var sprite := animal.get_node_or_null("Sprite2D") as Sprite2D
+	if not sprite or not sprite.texture:
+		return false
+	var parent_node := animal.get_parent() as Node2D
+	var parent_global_y: float = parent_node.global_position.y if parent_node else 0.0
+	const FEET_OFFSET := 20.0
+	var feet_offset: float = sprite.texture.get_height() / 2.0 * animal.scale.y + FEET_OFFSET
+	animal.position.y = ground_y - feet_offset - parent_global_y
+	return true
+
+
+func _find_free_flying_animal() -> Node:
+	for a: Node in get_tree().get_nodes_in_group("animals"):
+		if not a.get("is_hidden") and a.visible and not a.has_meta("managed_by_bush") and a.get("can_fly"):
+			return a
+	return null
+
+
+func _find_active_animal_by_id(animal_id: String) -> Node:
+	if _wm:
+		var key := animal_id + "_active_node"
+		if _wm.animals_state.has(key):
+			var active = _wm.animals_state[key]
+			if is_instance_valid(active):
+				return active
+	for a: Node in get_tree().get_nodes_in_group("animals"):
+		if _wm and _wm.get_animal_unique_id(a) == animal_id and a.visible:
+			return a
+	return null
+
+
+func _recycle_segment_containing_animal(animal: Node) -> bool:
+	if not animal or not _wm:
+		return false
+	var scroller = _wm.get("infinite_scroller")
+	if not scroller:
+		return false
+	var seg: Node2D = _wm.get_segment_for_animal(animal) as Node2D
+	if not seg:
+		return false
+
+	var seg_idx := -1
+	for i in range(scroller.segments.size()):
+		if scroller.segments[i].get("node") == seg:
+			seg_idx = i
+			break
+	if seg_idx < 0:
+		return false
+
+	var rightmost_x: float = scroller.get_rightmost_segment_x()
+	scroller.recycle_segment(seg_idx, rightmost_x + scroller.world_width)
+	await get_tree().create_timer(0.45).timeout
+	await get_tree().process_frame
+	return true
 
 func _find_free_animal() -> Node:
 	for a: Node in get_tree().get_nodes_in_group("animals"):
