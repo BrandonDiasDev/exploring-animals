@@ -11,6 +11,7 @@
 [ext_resource type="Script" uid="uid://d1yxnl41pesl5" path="res://scripts/world_clip_overlay.gd" id="8_overlay"]
 [ext_resource type="Script" uid="uid://dlhmoye2clmrs" path="res://tests/test_world_scenarios.gd" id="9_testrunner"]
 [ext_resource type="Script" uid="uid://dpdi6gjfcgifm" path="res://scripts/sun_moon.gd" id="10_sunmoon"]
+[ext_resource type="Script" path="res://scripts/clouds_layer.gd" id="11_clouds"]
 
 [node name="World" type="Node2D" unique_id=1902873090]
 script = ExtResource("1_dphjl")
@@ -46,6 +47,11 @@ script = ExtResource("5_v5dby")
 
 [node name="Background" type="Sprite2D" parent="WorldContainer" unique_id=1224924778]
 position = Vector2(-10685, -3618)
+z_index = -10
+
+[node name="CloudsLayer" type="Node2D" parent="WorldContainer" unique_id=552200118]
+z_index = -5
+script = ExtResource("11_clouds")
 
 [node name="Plane2" type="Node2D" parent="WorldContainer" unique_id=419779225]
 

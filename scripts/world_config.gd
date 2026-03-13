@@ -74,6 +74,35 @@ extends Node
 ## Cor dos painéis durante a noite (interpola a partir de clip_overlay_color).
 @export var clip_overlay_night_color: Color = Color(0.04, 0.04, 0.07, 1.0)
 
+# ── Nuvens (parallax) ─────────────────────────────────────────────────────────
+## Quantidade de nuvens ativas na camada global.
+@export_range(1, 32, 1) var cloud_count: int = 8
+
+## Velocidade horizontal mínima/máxima das nuvens (px/s).
+@export var cloud_speed_min: float = 18.0
+@export var cloud_speed_max: float = 42.0
+
+## Direção das nuvens: "mixed" (ambos os sentidos), "left" ou "right".
+@export_enum("mixed", "left", "right") var cloud_direction_mode: String = "mixed"
+
+## Fator de parallax relativo ao deslocamento da câmera (0..1).
+@export_range(0.0, 1.0, 0.01) var cloud_parallax_factor: float = 0.20
+
+## Faixa de escala aleatória aplicada por nuvem no spawn/reset.
+@export var cloud_scale_min: float = 0.65
+@export var cloud_scale_max: float = 1.35
+
+## Faixa vertical (Y mundo) para spawn das nuvens.
+@export var cloud_spawn_y_min: float = -560.0
+@export var cloud_spawn_y_max: float = -120.0
+
+## Buffer fora da tela para wrap/reposicionamento sem pop visível.
+@export var cloud_offscreen_buffer: float = 420.0
+
+## Faixa de alpha das nuvens para variação visual suave.
+@export var cloud_alpha_min: float = 0.65
+@export var cloud_alpha_max: float = 0.95
+
 # ── Estado global dia/noite ───────────────────────────────────────────────────
 ## `true` enquanto for dia; `false` enquanto for noite.
 ## Atualizado por sun_moon.gd no início de cada transição.

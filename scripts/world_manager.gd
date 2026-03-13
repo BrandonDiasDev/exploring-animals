@@ -25,6 +25,7 @@ var _validator = null
 
 # Referência ao ClipOverlay para acionar a transição dia/noite
 var _clip_overlay = null
+var _clouds_layer = null
 
 func _ready():
 	add_to_group("world_manager")
@@ -47,6 +48,7 @@ func _ready():
 	if sun_moon and sun_moon.has_signal("day_night_transition_started"):
 		sun_moon.day_night_transition_started.connect(self._on_day_night_transition_started)
 	_clip_overlay = get_node_or_null("ClipOverlay")
+	_clouds_layer = get_node_or_null("WorldContainer/CloudsLayer")
 
 func connect_animal_signals():
 	await get_tree().process_frame
@@ -93,6 +95,9 @@ func _on_day_night_transition_started(to_day: bool, duration: float) -> void:
 	# Transiciona a cor do overlay (topo/baixo da tela)
 	if is_instance_valid(_clip_overlay) and _clip_overlay.has_method("transition_day_night"):
 		_clip_overlay.transition_day_night(to_day, duration)
+	# Transiciona visibilidade das nuvens (somente dia)
+	if is_instance_valid(_clouds_layer) and _clouds_layer.has_method("apply_day_night"):
+		_clouds_layer.apply_day_night(to_day, true, duration)
 	# Notificar todos os animais ativos para atualizar o visual idle (dia/noite)
 	_notify_all_animals_day_night(to_day)
 

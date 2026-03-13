@@ -129,6 +129,14 @@ func run_all() -> void:
 	await _run("G12-L — WorldManager propaga snap dia para segmentos",        _g12l_wm_propagates_day)
 	await _run("G12-M — SunMoon emite sinal com parâmetros corretos",         _g12m_sun_moon_emits_signal)
 
+	# ── Grupo Cloud: Parallax / Layering / Dia-Noite ─────────────────────────────
+	await _run("GCloud-A — CloudsLayer existe e inicializa",                    _gclouda_layer_exists)
+	await _run("GCloud-B — hierarquia de z-order (bg < clouds < gameplay)",    _gcloudb_z_order)
+	await _run("GCloud-C — nuvens não entram em grupos animals/bushes",         _gcloudc_group_isolation)
+	await _run("GCloud-D — CloudsLayer persiste após recycle",                  _gcloudd_persists_after_recycle)
+	await _run("GCloud-E — nuvens só no dia (snap dia/noite)",                  _gcloude_day_only_transition)
+	await _run("GCloud-F — movimento horizontal + wrap sem drift vertical",     _gcloudf_horizontal_and_wrap)
+
 	# ── Grupo 13: FSM Invariants ──────────────────────────────────────────────────
 	await _run("G13-A — animal sempre normalizado para IDLE após transition_to(IDLE)", _g13a_idle_transition)
 	await _run("G13-B — can_fly=false usa FALL, não FLY, ao chamar apply_gravity",     _g13b_no_fly_for_ground_animal)
@@ -1258,6 +1266,138 @@ func _g12m_sun_moon_emits_signal() -> void:
 		var expected_dur: float = sun_moon.get("BG_TRANSITION_DURATION") if sun_moon.get("BG_TRANSITION_DURATION") else 4.5
 		_assert(is_equal_approx(float(capture[2]), expected_dur),
 			"duration=%.2f (esperado %.2f)" % [float(capture[2]), expected_dur])
+
+
+# ── Grupo Cloud: Parallax / Layering / Dia-Noite ─────────────────────────────
+
+func _gclouda_layer_exists() -> void:
+	var clouds = _get_clouds_layer()
+	if not clouds:
+		_skip_test("CloudsLayer não encontrada em WorldContainer/CloudsLayer")
+		return
+	var has_api := clouds.has_method("apply_day_night") and clouds.has_method("get_cloud_count")
+	_assert(has_api, "CloudsLayer sem API esperada (apply_day_night/get_cloud_count)")
+	_assert(int(clouds.call("get_cloud_count")) > 0, "CloudsLayer sem nuvens instanciadas")
+
+
+func _gcloudb_z_order() -> void:
+	var world_container := _wm.get_node_or_null("WorldContainer") if _wm else null
+	if not world_container:
+		_skip_test("WorldContainer não encontrado")
+		return
+	var bg := world_container.get_node_or_null("Background")
+	var clouds = world_container.get_node_or_null("CloudsLayer")
+	var plane2 := world_container.get_node_or_null("Plane2")
+	if not bg or not clouds or not plane2:
+		_skip_test("Background/CloudsLayer/Plane2 ausente")
+		return
+
+	_assert(bg.z_index < clouds.z_index,
+		"Background.z_index (%d) deve ser menor que CloudsLayer.z_index (%d)" % [bg.z_index, clouds.z_index])
+	_assert(clouds.z_index < plane2.z_index,
+		"CloudsLayer.z_index (%d) deve ser menor que Plane2.z_index (%d)" % [clouds.z_index, plane2.z_index])
+
+	var min_animal_z := INF
+	for a: Node in get_tree().get_nodes_in_group("animals"):
+		if a and is_instance_valid(a):
+			min_animal_z = minf(min_animal_z, float(a.z_index))
+	if min_animal_z < INF:
+		_assert(clouds.z_index < int(min_animal_z),
+			"CloudsLayer.z_index (%d) deve ser menor que z mínimo dos animais (%.0f)" % [clouds.z_index, min_animal_z])
+
+
+func _gcloudc_group_isolation() -> void:
+	var clouds = _get_clouds_layer()
+	if not clouds:
+		_skip_test("CloudsLayer não encontrada")
+		return
+	var leaked: Array[String] = []
+	for child in clouds.get_children():
+		if child.is_in_group("animals") or child.is_in_group("bushes"):
+			leaked.append(child.name)
+	_assert(leaked.is_empty(), "nuvens não devem pertencer a groups animals/bushes: %s" % str(leaked))
+
+
+func _gcloudd_persists_after_recycle() -> void:
+	var clouds = _get_clouds_layer()
+	var scroller = _wm.get("infinite_scroller") if _wm else null
+	if not clouds or not scroller:
+		_skip_test("CloudsLayer ou InfiniteScroller indisponível")
+		return
+	if scroller.segments.size() < 2:
+		_skip_test("menos de 2 segmentos ativos")
+		return
+
+	var id_before := clouds.get_instance_id()
+	var rightmost_x: float = scroller.get_rightmost_segment_x()
+	scroller.recycle_segment(0, rightmost_x + scroller.world_width)
+	await get_tree().create_timer(0.35).timeout
+	await get_tree().process_frame
+
+	var clouds_after = _get_clouds_layer()
+	_assert(clouds_after != null and is_instance_valid(clouds_after),
+		"CloudsLayer deveria continuar válida após recycle")
+	if clouds_after:
+		_assert(clouds_after.get_instance_id() == id_before,
+			"CloudsLayer não deveria ser recriada no recycle de segmento")
+
+
+func _gcloude_day_only_transition() -> void:
+	var clouds = _get_clouds_layer()
+	if not clouds:
+		_skip_test("CloudsLayer não encontrada")
+		return
+	if not _wm or not _wm.has_method("_on_day_night_transition_started"):
+		_skip_test("WorldManager sem hook de transição")
+		return
+
+	_wm._on_day_night_transition_started(false, 0.0)
+	await get_tree().process_frame
+	_assert(not clouds.visible and is_equal_approx(float(clouds.modulate.a), 0.0),
+		"à noite, nuvens devem ficar invisíveis")
+
+	_wm._on_day_night_transition_started(true, 0.0)
+	await get_tree().process_frame
+	_assert(clouds.visible and is_equal_approx(float(clouds.modulate.a), 1.0),
+		"de dia, nuvens devem ficar visíveis")
+
+
+func _gcloudf_horizontal_and_wrap() -> void:
+	var clouds = _get_clouds_layer()
+	if not clouds:
+		_skip_test("CloudsLayer não encontrada")
+		return
+	if not clouds.has_method("get_wrap_count"):
+		_skip_test("CloudsLayer sem métrica de wrap")
+		return
+	var children = clouds.get_children()
+	if children.is_empty():
+		_skip_test("CloudsLayer sem children")
+		return
+
+	var cloud0: Node2D = children[0]
+	var y_before: float = cloud0.position.y
+	# Forçar wrap da primeira nuvem via estado interno de direção + posição fora da tela.
+	var dir_map: Dictionary = clouds.get("_directions")
+	var speed_map: Dictionary = clouds.get("_speeds")
+	var cid := cloud0.get_instance_id()
+	dir_map[cid] = 1.0
+	speed_map[cid] = 50.0
+	cloud0.position.x = 100000.0
+	var wraps_before: int = int(clouds.call("get_wrap_count"))
+	clouds.call("_process", 0.016)
+	var wraps_after: int = int(clouds.call("get_wrap_count"))
+
+	_assert(wraps_after > wraps_before,
+		"wrap_count deveria aumentar quando nuvem sai da área visível")
+	_assert(is_equal_approx(cloud0.position.y, y_before),
+		"movimento de nuvem deve ser horizontal (y não deve variar no _process)")
+
+
+func _get_clouds_layer() -> Node:
+	if not _wm:
+		return null
+	return _wm.get_node_or_null("WorldContainer/CloudsLayer")
 
 
 # ── Grupo 13: FSM Invariants ──────────────────────────────────────────────────
