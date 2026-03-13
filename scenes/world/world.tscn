@@ -55,8 +55,12 @@ z_as_relative = true
 script = ExtResource("11_clouds")
 
 [node name="Plane2" type="Node2D" parent="WorldContainer" unique_id=419779225]
+z_index = 0
+z_as_relative = false
 
 [node name="Plane1" type="Node2D" parent="WorldContainer" unique_id=1363485164]
+z_index = 10
+z_as_relative = false
 
 [node name="ClipOverlay" type="CanvasLayer" parent="." unique_id=356704750]
 layer = 10

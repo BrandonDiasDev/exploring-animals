@@ -1300,6 +1300,28 @@ func _gcloudb_z_order() -> void:
 	_assert(clouds.z_as_relative,
 		"CloudsLayer deve usar z_as_relative=true para garantir z-order relativo no WorldContainer")
 
+	var scroller = _wm.get("infinite_scroller") if _wm else null
+	if scroller and scroller.has_method("get"):
+		for seg_data in scroller.segments:
+			var seg = seg_data.get("node")
+			if not is_instance_valid(seg):
+				continue
+			var seg_bg_day = seg.get_node_or_null("BackgroundDay")
+			var seg_bg_night = seg.get_node_or_null("BackgroundNight")
+			var seg_plane1 = seg.get_node_or_null("Plane1")
+			var seg_plane2 = seg.get_node_or_null("Plane2")
+			if not seg_bg_day or not seg_bg_night or not seg_plane1 or not seg_plane2:
+				continue
+
+			_assert(seg_bg_day.z_index < clouds.z_index,
+				"Segment BackgroundDay.z_index (%d) deve ser menor que CloudsLayer.z_index (%d)" % [seg_bg_day.z_index, clouds.z_index])
+			_assert(seg_bg_night.z_index < clouds.z_index,
+				"Segment BackgroundNight.z_index (%d) deve ser menor que CloudsLayer.z_index (%d)" % [seg_bg_night.z_index, clouds.z_index])
+			_assert(seg_plane1.z_index > seg_plane2.z_index,
+				"Segment Plane1.z_index (%d) deve ser maior que Plane2.z_index (%d)" % [seg_plane1.z_index, seg_plane2.z_index])
+			_assert(seg_plane2.z_as_relative == false and seg_plane1.z_as_relative == false,
+				"Segment Plane1/Plane2 devem usar z_as_relative=false para contrato de camada estável")
+
 	var min_animal_z := INF
 	for a: Node in get_tree().get_nodes_in_group("animals"):
 		if a and is_instance_valid(a):

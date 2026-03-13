@@ -11,18 +11,23 @@ script = ExtResource("seg_script")
 metadata/_edit_horizontal_guides_ = [702.0, -711.0]
 
 [node name="BackgroundDay" type="Sprite2D" parent="." unique_id=105916029]
+z_index = -10
 texture = ExtResource("2_gcobr")
 
 [node name="BackgroundNight" type="Sprite2D" parent="." unique_id=105916030]
 modulate = Color(1, 1, 1, 0)
+z_index = -10
 texture = ExtResource("3_ihu6p")
 
 [node name="Plane2" type="Node2D" parent="." unique_id=1908866073]
+z_as_relative = false
 
 [node name="Bush04" parent="Plane2" unique_id=70398715 instance=ExtResource("2_ku3sj")]
 position = Vector2(37, -245)
 
 [node name="Plane1" type="Node2D" parent="." unique_id=686078543]
+z_index = 10
+z_as_relative = false
 
 [node name="Ema" parent="Plane1" unique_id=1782675260 instance=ExtResource("2_inm2u")]
 position = Vector2(534, 514)

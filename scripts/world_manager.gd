@@ -1082,12 +1082,18 @@ func _log_reveal_next_frame(animal, animal_id: String):
 
 func reconnect_animal_signals(animal):
 	"""Reconectar sinais de um animal (usado após reciclagem de segmento)"""
-	if animal.animal_drag_started.is_connected(_on_animal_drag_started):
-		animal.animal_drag_started.disconnect(_on_animal_drag_started)
-	if animal.animal_drag_ended.is_connected(_on_animal_drag_ended):
-		animal.animal_drag_ended.disconnect(_on_animal_drag_ended)
-	if animal.animal_clicked.is_connected(_on_animal_clicked):
-		animal.animal_clicked.disconnect(_on_animal_clicked)
+	if not is_instance_valid(animal):
+		return
+
+	if animal.has_signal("animal_drag_started"):
+		if animal.animal_drag_started.is_connected(_on_animal_drag_started):
+			animal.animal_drag_started.disconnect(_on_animal_drag_started)
+	if animal.has_signal("animal_drag_ended"):
+		if animal.animal_drag_ended.is_connected(_on_animal_drag_ended):
+			animal.animal_drag_ended.disconnect(_on_animal_drag_ended)
+	if animal.has_signal("animal_clicked"):
+		if animal.animal_clicked.is_connected(_on_animal_clicked):
+			animal.animal_clicked.disconnect(_on_animal_clicked)
 	
 	# Reconectar
 	if animal.has_signal("animal_drag_started"):
