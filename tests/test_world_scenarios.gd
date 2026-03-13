@@ -1297,6 +1297,9 @@ func _gcloudb_z_order() -> void:
 	_assert(clouds.z_index < plane2.z_index,
 		"CloudsLayer.z_index (%d) deve ser menor que Plane2.z_index (%d)" % [clouds.z_index, plane2.z_index])
 
+	_assert(clouds.z_as_relative,
+		"CloudsLayer deve usar z_as_relative=true para garantir z-order relativo no WorldContainer")
+
 	var min_animal_z := INF
 	for a: Node in get_tree().get_nodes_in_group("animals"):
 		if a and is_instance_valid(a):
@@ -1377,6 +1380,13 @@ func _gcloudf_horizontal_and_wrap() -> void:
 
 	var cloud0: Node2D = children[0]
 	var y_before: float = cloud0.position.y
+	var skyline_y: float = float(clouds.call("_get_cfg_float", "skyline_y", -444.0))
+	for cloud_child in children:
+		var cloud_node := cloud_child as Node2D
+		if cloud_node:
+			_assert(cloud_node.position.y <= skyline_y,
+				"nuvem '%s' em y=%.2f abaixo da skyline=%.2f" % [cloud_node.name, cloud_node.position.y, skyline_y])
+
 	# Forçar wrap da primeira nuvem via estado interno de direção + posição fora da tela.
 	var dir_map: Dictionary = clouds.get("_directions")
 	var speed_map: Dictionary = clouds.get("_speeds")

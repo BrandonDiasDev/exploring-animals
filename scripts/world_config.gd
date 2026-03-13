@@ -94,7 +94,7 @@ extends Node
 
 ## Faixa vertical (Y mundo) para spawn das nuvens.
 @export var cloud_spawn_y_min: float = -560.0
-@export var cloud_spawn_y_max: float = -120.0
+@export var cloud_spawn_y_max: float = -350.0
 
 ## Buffer fora da tela para wrap/reposicionamento sem pop visível.
 @export var cloud_offscreen_buffer: float = 420.0

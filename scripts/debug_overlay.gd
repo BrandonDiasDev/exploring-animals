@@ -15,6 +15,8 @@ const _CATEGORIES: Array = [
 	["hole",         "Buraco (hole)"],
 	["sun_moon",     "Sol/Lua (posição)"],
 	["animal_fsm",   "FSM Animal (estado)"],
+	["clouds",       "Nuvens / Parallax"],
+	["debug_input",  "Debug input (F1)"],
 ]
 
 var _panel: PanelContainer
@@ -25,6 +27,8 @@ func _ready() -> void:
 	layer = 128          # On top of everything
 	_build_ui()
 	_panel.visible = false
+	if DebugLogger.enabled and DebugLogger.debug_input:
+		print("[DBG OVERLAY] ready | layer:", layer, " | panel_visible:", _panel.visible)
 
 func _build_ui() -> void:
 	_panel = PanelContainer.new()
@@ -103,8 +107,21 @@ func _refresh_all() -> void:
 			cb.button_pressed = DebugLogger.get_category(cat[0])
 			cb.set_block_signals(false)
 
+func _input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo:
+		var is_f1: bool = event.keycode == KEY_F1 or event.physical_keycode == KEY_F1
+		if is_f1 and DebugLogger.enabled and DebugLogger.debug_input:
+			print("[DBG OVERLAY _input] F1 received | keycode:", event.keycode,
+				" | physical:", event.physical_keycode,
+				" | panel_visible:", _panel.visible)
+
 func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_F1:
+		var is_f1: bool = event.keycode == KEY_F1 or event.physical_keycode == KEY_F1
+		if is_f1 and DebugLogger.enabled and DebugLogger.debug_input:
+			print("[DBG OVERLAY _unhandled_key_input] F1 reached unhandled -> toggle panel")
+		if is_f1:
 			_panel.visible = not _panel.visible
+			if DebugLogger.enabled and DebugLogger.debug_input:
+				print("[DBG OVERLAY] panel_visible:", _panel.visible)
 			get_viewport().set_input_as_handled()

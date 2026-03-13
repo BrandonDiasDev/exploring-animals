@@ -42,6 +42,12 @@ var sun_moon: bool = false
 ## FSM do animal: transition_to, _enter/_exit_state, idle_visual (awake/sleep).
 var animal_fsm: bool = false
 
+## Nuvens/parallax: spawn, reset, wrap, direção, bounds, camada e skyline.
+var clouds: bool = true
+
+## Overlay/input de debug: rastreia o caminho da tecla F1 no pipeline de input.
+var debug_input: bool = true
+
 # ─── Helpers ───────────────────────────────────────────────────────────────────
 
 ## Enable all individual categories (and master switch).
@@ -58,6 +64,8 @@ func enable_all() -> void:
 	hole = true
 	sun_moon = true
 	animal_fsm = true
+	clouds = true
+	debug_input = true
 
 ## Disable all individual categories (master switch stays true).
 func disable_all() -> void:
@@ -72,6 +80,8 @@ func disable_all() -> void:
 	hole = false
 	sun_moon = false
 	animal_fsm = false
+	clouds = false
+	debug_input = false
 
 ## Get raw flag value for a category by name (for UI display — ignores master switch).
 func get_category(category: String) -> bool:
@@ -87,6 +97,8 @@ func get_category(category: String) -> bool:
 		"hole": return hole
 		"sun_moon": return sun_moon
 		"animal_fsm": return animal_fsm
+		"clouds": return clouds
+		"debug_input": return debug_input
 	return false
 
 ## Set a category flag by name.
@@ -103,3 +115,5 @@ func set_category(category: String, value: bool) -> void:
 		"hole": hole = value
 		"sun_moon": sun_moon = value
 		"animal_fsm": animal_fsm = value
+		"clouds": clouds = value
+		"debug_input": debug_input = value
