@@ -1,11 +1,9 @@
 [gd_scene format=3 uid="uid://c43px4eeuf2it"]
 
-[ext_resource type="PackedScene" uid="uid://bvhtqtt21nuou" path="res://scenes/components/bush02.tscn" id="2_e1dsy"]
-[ext_resource type="Texture2D" uid="uid://cntsnis27drea" path="res://assets/backgrounds/2-day.png" id="2_eyj6s"]
-[ext_resource type="PackedScene" uid="uid://b26y5t483lssx" path="res://scenes/components/onca.tscn" id="3_e1dsy"]
-[ext_resource type="Texture2D" uid="uid://g3p3lfisabem" path="res://assets/backgrounds/2-night.png" id="3_po3gx"]
-[ext_resource type="PackedScene" uid="uid://wmaxxj2rmo7u" path="res://scenes/components/bush03.tscn" id="4_8wsw7"]
-[ext_resource type="PackedScene" uid="uid://brjgm5r7cqny8" path="res://scenes/components/tamandua.tscn" id="5_5p0bt"]
+[ext_resource type="Texture2D" uid="uid://qs534vcmqhl2" path="res://assets/backgrounds/2-day.png" id="2_eyj6s"]
+[ext_resource type="Texture2D" uid="uid://doap7u3vj1ur1" path="res://assets/backgrounds/2-night.png" id="3_po3gx"]
+[ext_resource type="PackedScene" uid="uid://b2xk5k78by648" path="res://scenes/components/bush01.tscn" id="4_ccvav"]
+[ext_resource type="PackedScene" uid="uid://c56qu60hhfqpm" path="res://scenes/components/hole01.tscn" id="5_8wsw7"]
 [ext_resource type="Script" uid="uid://chjdudqckkvp" path="res://scripts/world_segment.gd" id="seg_script"]
 
 [node name="WorldSegment" type="Node2D" unique_id=1767376223]
@@ -24,14 +22,12 @@ texture = ExtResource("3_po3gx")
 [node name="Plane2" type="Node2D" parent="." unique_id=1999616768]
 z_as_relative = false
 
-[node name="Bush02" parent="Plane2" unique_id=70398715 instance=ExtResource("2_e1dsy")]
-position = Vector2(-668, -213)
-hidden_animal_scene = ExtResource("3_e1dsy")
+[node name="Bush01" parent="Plane2" unique_id=70398715 instance=ExtResource("4_ccvav")]
+position = Vector2(-495, 20)
+
+[node name="Hole01" parent="Plane2/Bush01" unique_id=1160025278 instance=ExtResource("5_8wsw7")]
+position = Vector2(897, -115)
 
 [node name="Plane1" type="Node2D" parent="." unique_id=1304941121]
 z_index = 10
 z_as_relative = false
-
-[node name="Bush03" parent="Plane1" unique_id=1323756315 instance=ExtResource("4_8wsw7")]
-position = Vector2(691, 619)
-hidden_animal_scene = ExtResource("5_5p0bt")

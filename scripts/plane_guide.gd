@@ -6,7 +6,7 @@ const _WorldConfig := preload("res://scripts/world_config.gd")
 
 func _draw() -> void:
 	var cfg := get_node_or_null("/root/WorldConfig") as _WorldConfig
-	if not cfg or not cfg.show_plane_guide:
+	if not cfg or not cfg.show_plane_guide or not cfg.debug_visuals_enabled:
 		return
 
 	var camera := get_viewport().get_camera_2d()

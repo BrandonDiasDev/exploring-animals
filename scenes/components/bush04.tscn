@@ -1,10 +1,10 @@
 [gd_scene format=3 uid="uid://ibxmkrl1bu25"]
 
 [ext_resource type="Script" uid="uid://dxowuprhe2wap" path="res://scripts/bush.gd" id="1_70mx0"]
-[ext_resource type="Texture2D" uid="uid://dal6k85u4djcq" path="res://assets/vegetation/arbusto04.png" id="2_at80x"]
+[ext_resource type="Texture2D" uid="uid://14780n0ek1nf" path="res://assets/vegetation/arbusto04.png" id="2_at80x"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_hkfrc"]
-size = Vector2(125, 474)
+size = Vector2(495, 283)
 
 [node name="Bush04" type="Node2D" unique_id=70398715]
 script = ExtResource("1_70mx0")
@@ -17,5 +17,5 @@ texture = ExtResource("2_at80x")
 [node name="Area2D" type="Area2D" parent="." unique_id=1108052154]
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=147087270]
-position = Vector2(2.5, 10)
+position = Vector2(-80.5, -75.5)
 shape = SubResource("RectangleShape2D_hkfrc")

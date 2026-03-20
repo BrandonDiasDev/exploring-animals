@@ -48,7 +48,7 @@ func _build_ui() -> void:
 
 	# Title
 	var title := Label.new()
-	title.text = "Debug Logs  [F1 fecha]"
+	title.text = "Debug Logs  [F1 painel | F2 visual]"
 	title.add_theme_font_size_override("font_size", 18)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(title)
@@ -118,10 +118,21 @@ func _input(event: InputEvent) -> void:
 func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		var is_f1: bool = event.keycode == KEY_F1 or event.physical_keycode == KEY_F1
+		var is_f2: bool = event.keycode == KEY_F2 or event.physical_keycode == KEY_F2
 		if is_f1 and DebugLogger.enabled and DebugLogger.debug_input:
 			print("[DBG OVERLAY _unhandled_key_input] F1 reached unhandled -> toggle panel")
 		if is_f1:
 			_panel.visible = not _panel.visible
 			if DebugLogger.enabled and DebugLogger.debug_input:
 				print("[DBG OVERLAY] panel_visible:", _panel.visible)
+			get_viewport().set_input_as_handled()
+			return
+
+		if is_f2:
+			WorldConfig.debug_visuals_enabled = not WorldConfig.debug_visuals_enabled
+			var plane_guide_control := get_node_or_null("/root/World/PlaneGuide/Control") as Control
+			if plane_guide_control:
+				plane_guide_control.queue_redraw()
+			if DebugLogger.enabled and DebugLogger.debug_input:
+				print("[DBG OVERLAY] debug_visuals_enabled:", WorldConfig.debug_visuals_enabled)
 			get_viewport().set_input_as_handled()

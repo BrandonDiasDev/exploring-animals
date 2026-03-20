@@ -1,10 +1,10 @@
 [gd_scene format=3 uid="uid://bvhtqtt21nuou"]
 
 [ext_resource type="Script" uid="uid://dxowuprhe2wap" path="res://scripts/bush.gd" id="1_d08ms"]
-[ext_resource type="Texture2D" uid="uid://01djtn8v7hlq" path="res://assets/vegetation/arbusto02.png" id="2_t2kmt"]
+[ext_resource type="Texture2D" uid="uid://cb7i8kyy72ufh" path="res://assets/vegetation/arbusto02.png" id="2_t2kmt"]
 
-[sub_resource type="CircleShape2D" id="CircleShape2D_4vdpm"]
-radius = 181.00276
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_t2kmt"]
+size = Vector2(648, 462)
 
 [node name="Bush02" type="Node2D" unique_id=70398715]
 script = ExtResource("1_d08ms")
@@ -17,5 +17,5 @@ texture = ExtResource("2_t2kmt")
 [node name="Area2D" type="Area2D" parent="." unique_id=1108052154]
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="Area2D" unique_id=238124141]
-position = Vector2(-2, 33)
-shape = SubResource("CircleShape2D_4vdpm")
+position = Vector2(-3, -97)
+shape = SubResource("RectangleShape2D_t2kmt")
