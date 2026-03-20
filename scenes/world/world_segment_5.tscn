@@ -24,7 +24,7 @@ texture = ExtResource("3_1pw8d")
 [node name="Plane2" type="Node2D" parent="." unique_id=572081845]
 z_as_relative = false
 
-[node name="Arbusto04" type="Sprite2D" parent="Plane2" unique_id=1570208549]
+[node name="Arbusto04_L" type="Sprite2D" parent="Plane2" unique_id=1570208549]
 position = Vector2(864, -390)
 texture = ExtResource("6_1pw8d")
 
