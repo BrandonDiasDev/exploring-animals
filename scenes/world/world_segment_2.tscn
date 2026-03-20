@@ -4,6 +4,7 @@
 [ext_resource type="Texture2D" uid="uid://doap7u3vj1ur1" path="res://assets/backgrounds/2-night.png" id="3_po3gx"]
 [ext_resource type="PackedScene" uid="uid://b2xk5k78by648" path="res://scenes/components/bush01.tscn" id="4_ccvav"]
 [ext_resource type="PackedScene" uid="uid://c56qu60hhfqpm" path="res://scenes/components/hole01.tscn" id="5_8wsw7"]
+[ext_resource type="PackedScene" uid="uid://bie6nmplbk270" path="res://scenes/components/bush09.tscn" id="6_5p0bt"]
 [ext_resource type="Script" uid="uid://chjdudqckkvp" path="res://scripts/world_segment.gd" id="seg_script"]
 
 [node name="WorldSegment" type="Node2D" unique_id=1767376223]
@@ -27,6 +28,10 @@ position = Vector2(-495, 20)
 
 [node name="Hole01" parent="Plane2/Bush01" unique_id=1160025278 instance=ExtResource("5_8wsw7")]
 position = Vector2(897, -115)
+
+[node name="Bush" parent="Plane2/Bush01" unique_id=2040923665 instance=ExtResource("6_5p0bt")]
+position = Vector2(1260, 355)
+accepted_animal_names = Array[String](["Pato", "Tamandua", "Capivara"])
 
 [node name="Plane1" type="Node2D" parent="." unique_id=1304941121]
 z_index = 10

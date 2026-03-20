@@ -242,10 +242,24 @@ func _on_bush_animal_revealed(animal: Animal):
 		if DebugLogger.bush: print("[BUSH REVEAL] Registered animal:", animal_id, "| plane:", animal.current_plane, "| is_hidden:false")
 	else:
 		# Estado já existe (animal da cena que foi encontrado por restore_animal_state).
-		# Apenas atualiza is_hidden e garante que o active_node aponta para este nó.
+		# Atualizar também scene/posição/plano para evitar estado stale após reveal.
+		# Sem isso, local_position antigo (salvo enquanto estava escondido na moita)
+		# pode vazar para o estado livre e quebrar as invariantes de boundary.
+		animals_state[animal_id]["plane"] = animal.current_plane
+		animals_state[animal_id]["scene_index"] = segment.get_meta("scene_index", -1)
+		animals_state[animal_id]["local_position"] = animal.position
+		animals_state[animal_id]["scale"] = animal.scale
 		animals_state[animal_id]["is_hidden"] = false
+		# Animal está livre: bush_id não deve permanecer preso ao estado antigo.
+		if animals_state[animal_id].has("bush_id"):
+			animals_state[animal_id].erase("bush_id")
 		animals_state[animal_id + "_active_node"] = animal
-		if DebugLogger.bush: print("[BUSH REVEAL] Updated existing state for:", animal_id, "| is_hidden -> false | active_node set")
+		if DebugLogger.bush:
+			print("[BUSH REVEAL] Updated existing state for:", animal_id,
+				"| plane:", animal.current_plane,
+				"| scene_index:", segment.get_meta("scene_index", -1),
+				"| local_pos:", animal.position,
+				"| is_hidden:false | active_node set")
 
 	validate_state("after_bush_reveal")
 

@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://dymxkx07niar6" path="res://scripts/animal.gd" id="1_5fk76"]
 [ext_resource type="Texture2D" uid="uid://bv8s84euk32nk" path="res://assets/animals/onca.png" id="2_qsgin"]
-[ext_resource type="Texture2D" uid="uid://dgnl2ppwtjtr0" path="res://assets/animals/sleep.png" id="3_dctrm"]
+[ext_resource type="Texture2D" uid="uid://62bja2ojknk7" path="res://assets/animals/onca-sleep.png" id="3_wkhmb"]
 [ext_resource type="Texture2D" uid="uid://d7y3rqxgfjdb" path="res://assets/animals/onca-fall.png" id="4_wkhmb"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_dctrm"]
@@ -12,7 +12,7 @@ size = Vector2(164, 271)
 script = ExtResource("1_5fk76")
 animal_name = "Onca"
 idle_awake_texture = ExtResource("2_qsgin")
-idle_sleep_texture = ExtResource("3_dctrm")
+idle_sleep_texture = ExtResource("3_wkhmb")
 fall_texture = ExtResource("4_wkhmb")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=849273167]

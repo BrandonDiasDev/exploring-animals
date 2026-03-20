@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://dymxkx07niar6" path="res://scripts/animal.gd" id="1_ssy1p"]
 [ext_resource type="Texture2D" uid="uid://cbihnh5xw16hv" path="res://assets/animals/pato-mergulhao.png" id="2_tw6dk"]
-[ext_resource type="Texture2D" uid="uid://dgnl2ppwtjtr0" path="res://assets/animals/sleep.png" id="3_ohec4"]
+[ext_resource type="Texture2D" uid="uid://b7nlt1gqkhglb" path="res://assets/animals/pato-sleep.png" id="3_pubej"]
 [ext_resource type="Texture2D" uid="uid://dws4gspgs4bt2" path="res://assets/animals/pato-fly.png" id="4_pubej"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_tw6dk"]
@@ -14,7 +14,7 @@ animal_name = "Pato"
 current_plane = "plane1"
 can_fly = true
 idle_awake_texture = ExtResource("2_tw6dk")
-idle_sleep_texture = ExtResource("3_ohec4")
+idle_sleep_texture = ExtResource("3_pubej")
 fly_texture = ExtResource("4_pubej")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=1278010209]

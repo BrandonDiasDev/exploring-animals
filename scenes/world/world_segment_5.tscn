@@ -4,8 +4,8 @@
 [ext_resource type="PackedScene" uid="uid://cqhdx5be3cbc5" path="res://scenes/components/tatu.tscn" id="2_nwjd1"]
 [ext_resource type="Texture2D" uid="uid://dqhtlmhcr2les" path="res://assets/backgrounds/5-night.png" id="3_1pw8d"]
 [ext_resource type="PackedScene" uid="uid://boguhln66xixy" path="res://scenes/components/lobo.tscn" id="4_1pw8d"]
-[ext_resource type="Texture2D" uid="uid://14780n0ek1nf" path="res://assets/vegetation/arbusto04.png" id="6_1pw8d"]
-[ext_resource type="Texture2D" uid="uid://cb7i8kyy72ufh" path="res://assets/vegetation/arbusto02.png" id="7_l1i6r"]
+[ext_resource type="PackedScene" uid="uid://cleiorebn6k27" path="res://scenes/components/bush05.tscn" id="7_g8r1w"]
+[ext_resource type="PackedScene" uid="uid://b0movx4b2wuwe" path="res://scenes/components/bush07.tscn" id="7_l1i6r"]
 [ext_resource type="Script" uid="uid://chjdudqckkvp" path="res://scripts/world_segment.gd" id="seg_script"]
 
 [node name="WorldSegment" type="Node2D" unique_id=817559777]
@@ -24,9 +24,8 @@ texture = ExtResource("3_1pw8d")
 [node name="Plane2" type="Node2D" parent="." unique_id=572081845]
 z_as_relative = false
 
-[node name="Arbusto04_L" type="Sprite2D" parent="Plane2" unique_id=1570208549]
-position = Vector2(864, -390)
-texture = ExtResource("6_1pw8d")
+[node name="Bush05" parent="Plane2" unique_id=70398715 instance=ExtResource("7_g8r1w")]
+position = Vector2(848, -378)
 
 [node name="Lobo" parent="Plane2" unique_id=342004318 instance=ExtResource("4_1pw8d")]
 position = Vector2(-806, 50)
@@ -38,7 +37,5 @@ z_as_relative = false
 [node name="Tatu" parent="Plane1" unique_id=471309178 instance=ExtResource("2_nwjd1")]
 position = Vector2(-276, 338)
 
-[node name="Arbusto02" type="Sprite2D" parent="Plane1" unique_id=805611139]
-position = Vector2(388, 438.00003)
-scale = Vector2(0.6045845, 0.6045845)
-texture = ExtResource("7_l1i6r")
+[node name="Bush07" parent="." unique_id=1777413586 instance=ExtResource("7_l1i6r")]
+position = Vector2(351, 399)

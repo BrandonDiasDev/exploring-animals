@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://dymxkx07niar6" path="res://scripts/animal.gd" id="1_kktl0"]
 [ext_resource type="Texture2D" uid="uid://d0xw18fpo4wdp" path="res://assets/animals/uruatu.png" id="2_fwvl0"]
-[ext_resource type="Texture2D" uid="uid://dgnl2ppwtjtr0" path="res://assets/animals/sleep.png" id="3_eso8s"]
+[ext_resource type="Texture2D" uid="uid://c50qkbywpfa7a" path="res://assets/animals/uruatu-sleep.png" id="3_j2kew"]
 [ext_resource type="Texture2D" uid="uid://cnx4dl3pn4n1p" path="res://assets/animals/uruatu-fly.png" id="4_j2kew"]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_eso8s"]
@@ -15,7 +15,7 @@ animal_name = "Uruatu"
 current_plane = "plane1"
 can_fly = true
 idle_awake_texture = ExtResource("2_fwvl0")
-idle_sleep_texture = ExtResource("3_eso8s")
+idle_sleep_texture = ExtResource("3_j2kew")
 sleeps_at_night = false
 fly_texture = ExtResource("4_j2kew")
 

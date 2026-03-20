@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://dymxkx07niar6" path="res://scripts/animal.gd" id="1_ajemn"]
 [ext_resource type="Texture2D" uid="uid://c05oyjoyswy4s" path="res://assets/animals/tatu-canastra.png" id="2_4iypf"]
-[ext_resource type="Texture2D" uid="uid://dgnl2ppwtjtr0" path="res://assets/animals/sleep.png" id="3_vbos2"]
+[ext_resource type="Texture2D" uid="uid://cfdii3wl81jd5" path="res://assets/animals/tatu-sleep.png" id="3_y3hbj"]
 [ext_resource type="Texture2D" uid="uid://dpsqc21c4uch1" path="res://assets/animals/tatu-fall.png" id="4_y3hbj"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_vbos2"]
@@ -14,7 +14,7 @@ animal_name = "Tatu"
 is_hidden = null
 can_fly = null
 idle_awake_texture = ExtResource("2_4iypf")
-idle_sleep_texture = ExtResource("3_vbos2")
+idle_sleep_texture = ExtResource("3_y3hbj")
 fall_texture = ExtResource("4_y3hbj")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=920839805]
