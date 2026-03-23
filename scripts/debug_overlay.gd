@@ -15,6 +15,8 @@ const _CATEGORIES: Array = [
 	["hole",         "Buraco (hole)"],
 	["sun_moon",     "Sol/Lua (posição)"],
 	["animal_fsm",   "FSM Animal (estado)"],
+	["water",        "Água/Submerso (trigger)"],
+	["sprite",       "Sprite (seleção/aplicação)"],
 	["clouds",       "Nuvens / Parallax"],
 	["debug_input",  "Debug input (F1)"],
 ]

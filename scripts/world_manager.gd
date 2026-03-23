@@ -295,6 +295,19 @@ func restore_bush_state(bush):
 		connect_bush_signals_for(bush)
 		return
 	var state = bushes_state[bush_id]
+	# Defesa contra colisão de ID entre cenas diferentes (mesmo bush.name).
+	# Se o state salvo veio de outro scene_index, não aplicar neste bush.
+	var guard_segment = get_node_or_null_in_parents(bush)
+	var guard_scene_index = guard_segment.get_meta("scene_index", -1) if guard_segment else -1
+	var guard_saved_scene_index = state.get("scene_index", -1)
+	if guard_saved_scene_index != -1 and guard_scene_index != -1 and guard_saved_scene_index != guard_scene_index:
+		if DebugLogger.bush:
+			print("[RESTORE BUSH] ", bush.name,
+				" -> state ignorado (scene mismatch) saved:", guard_saved_scene_index,
+				" this:", guard_scene_index,
+				" | bush_id:", bush_id)
+		connect_bush_signals_for(bush)
+		return
 	if state["is_revealed"]:
 		# _ready() pode ter instanciado um novo animal, mas o arbusto já estava revelado.
 		# Liberamos o animal recém-criado para não duplicar.
@@ -563,23 +576,50 @@ func move_animal_to_segment(animal, target_segment: Node2D, _target_local_pos: V
 	if DebugLogger.animal_state: print("[MOVE] Animal moved to segment scene_index:", target_segment.get_meta("scene_index", -1), " | new parent:", target_plane.name, " | global_pos:", animal.global_position)
 
 func find_segment_containing_position(global_pos: Vector2) -> Node2D:
-	"""Find which segment contains the given global position"""
+	"""Find which segment contains the given global position.
+	Prioriza o segmento cujo intervalo [x, x + world_width) contém global_pos.x.
+	Fallback: menor distância ao intervalo (não à origem), para evitar escolher
+	segmento errado perto da borda esquerda/direita."""
 	if not infinite_scroller:
 		return null
-	
+
 	var segments = infinite_scroller.segments
-	var closest_segment = null
-	var min_distance = INF
-	
+	if segments.is_empty():
+		return null
+
+	var gx: float = global_pos.x
+	var ww: float = world_width if world_width > 0.0 else infinite_scroller.get("world_width")
+	if ww <= 0.0:
+		ww = 1920.0
+
+	# 1) Match exato por intervalo do segmento
 	for segment_data in segments:
-		var segment = segment_data["node"]
-		var segment_x = segment.global_position.x
-		var distance = abs(global_pos.x - segment_x)
-		
-		if distance < min_distance:
-			min_distance = distance
+		var segment: Node2D = segment_data["node"]
+		if not is_instance_valid(segment):
+			continue
+		var left: float = segment.global_position.x
+		var right: float = left + ww
+		if gx >= left and gx < right:
+			return segment
+
+	# 2) Fallback robusto: menor distância ao intervalo [left, right)
+	var closest_segment: Node2D = null
+	var min_interval_distance: float = INF
+	for segment_data in segments:
+		var segment: Node2D = segment_data["node"]
+		if not is_instance_valid(segment):
+			continue
+		var left: float = segment.global_position.x
+		var right: float = left + ww
+		var d: float = 0.0
+		if gx < left:
+			d = left - gx
+		elif gx >= right:
+			d = gx - right
+		if d < min_interval_distance:
+			min_interval_distance = d
 			closest_segment = segment
-	
+
 	return closest_segment
 
 func check_and_create_missing_animal(segment: Node2D):
@@ -727,9 +767,8 @@ func extract_animal_from_bush(animal: Animal, segment: Node2D, state: Dictionary
 	reconnect_animal_signals(animal)
 	
 	if DebugLogger.animal_create: print("[EXTRACT] Restored ", animal_id, " from bush | plane:", animal.current_plane, " | local_pos:", animal.position, " | global_pos:", animal.global_position)
-	# Verificar gravidade após extrair da moita (animal pode estar acima da terra).
-	if animal.has_method("apply_gravity"):
-		animal.apply_gravity()
+	# Reconciliar água/gravidade em deferred para evitar corrida com atualização de física.
+	call_deferred("_post_restore_animal_state", animal, "extract_from_bush")
 
 func create_animal_in_segment(segment: Node2D, animal_id: String, state: Dictionary):
 	"""Instantiate a new animal node and restore its state"""
@@ -838,9 +877,9 @@ func create_animal_in_segment(segment: Node2D, animal_id: String, state: Diction
 	# Connect signals
 	await get_tree().process_frame
 	reconnect_animal_signals(animal)
-	# Verificar gravidade após criar animal (pode ter sido criado acima da linha de terra).
-	if is_instance_valid(animal) and animal.has_method("apply_gravity") and animal.visible:
-		animal.apply_gravity()
+	# Reconciliar água/gravidade em deferred para evitar corrida com atualização de física.
+	if is_instance_valid(animal) and animal.visible:
+		call_deferred("_post_restore_animal_state", animal, "create_animal")
 	
 	if DebugLogger.animal_create: print("[CREATE MISSING] Created ", animal_name, " in scene_index:", segment.get_meta("scene_index", -1), " | local_pos:", animal.position, " | global_pos:", animal.global_position)
 
@@ -958,6 +997,9 @@ func restore_animal_state(animal):
 		animal.set_physics_process(true)
 		if animal.has_method("set_process_input"):
 			animal.set_process_input(true)
+		if animal.has_node("Area2D"):
+			animal.get_node("Area2D").set_deferred("monitoring", not animal.is_hidden)
+			animal.get_node("Area2D").set_deferred("monitorable", true)
 		
 		if animal.current_plane == "plane2":
 			animal.z_index = 100
@@ -972,9 +1014,9 @@ func restore_animal_state(animal):
 		reconnect_animal_signals(animal)
 		
 		if DebugLogger.animal_state: print("[RESTORE] id:", animal_id, "| plane:", state["plane"], "| final_global_pos:", animal.global_position, "| ACTIVE")
-		# Verificar gravidade após restaurar a posição (animal pode estar acima da terra).
-		if animal.has_method("apply_gravity"):
-			animal.apply_gravity()
+		# Reconciliar água/gravidade em deferred para evitar corrida com atualização de física.
+		if animal.visible:
+			call_deferred("_post_restore_animal_state", animal, "restore_existing")
 		return true
 	else:
 		# First time - save initial state based on which segment animal was created in
@@ -1013,9 +1055,12 @@ func restore_animal_state(animal):
 			reconnect_animal_signals(animal)
 			if animal.has_method("notify_day_night_changed"):
 				animal.notify_day_night_changed(WorldConfig.is_day)
-			# Verificar gravidade para animal inicial (pode estar acima da terra na cena).
-			if animal.has_method("apply_gravity"):
-				animal.apply_gravity()
+			if animal.has_node("Area2D"):
+				animal.get_node("Area2D").set_deferred("monitoring", not animal.is_hidden)
+				animal.get_node("Area2D").set_deferred("monitorable", true)
+			# Reconciliar água/gravidade em deferred para evitar corrida com atualização de física.
+			if animal.visible:
+				call_deferred("_post_restore_animal_state", animal, "restore_first_time")
 			return true
 		else:
 			if DebugLogger.animal_state: print("[RESTORE ERROR] First time but no segment found")
@@ -1116,6 +1161,21 @@ func reconnect_animal_signals(animal):
 		animal.animal_drag_ended.connect(_on_animal_drag_ended)
 	if animal.has_signal("animal_clicked"):
 		animal.animal_clicked.connect(_on_animal_clicked)
+
+func _post_restore_animal_state(animal: Animal, reason: String = "") -> void:
+	"""Reconcilia estado de água e aplica gravidade somente quando não submerso.
+	Executado em deferred para evitar corrida com broadphase/overlaps após reparent."""
+	if not is_instance_valid(animal):
+		return
+	if animal.is_hidden or not animal.visible:
+		return
+	if animal.has_method("resync_water_state"):
+		animal.resync_water_state("wm:" + reason)
+	# Se ainda está submerso após resync, não acionar gravidade.
+	if animal.current_state == Animal.AnimalState.SUBMERSO:
+		return
+	if animal.has_method("apply_gravity"):
+		animal.apply_gravity()
 
 # ─── Debug: validação de invariantes ─────────────────────────────────────────
 

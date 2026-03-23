@@ -54,6 +54,9 @@ var fall_tween: Tween = null
 var _submerged_textures: Array[Texture2D] = []
 var _current_submerged_texture: Texture2D = null
 var _water_overlap_count: int = 0
+var _water_overlap_ids: Dictionary = {}
+var _last_water_trigger: String = ""
+var _last_water_zone_name: String = ""
 ## Textura padrão capturada da cena em _ready(); usada como fallback de IDLE.
 var _default_idle_texture: Texture2D = null
 ## Duração em segundos que o animal permanece acordado após ser perturbado (durante o período de sono).
@@ -197,54 +200,188 @@ func _load_submerged_textures() -> void:
 		var tex := load(path) as Texture2D
 		if tex != null:
 			_submerged_textures.append(tex)
+	if DebugLogger.enabled and DebugLogger.sprite:
+		print("[SPRITE LOAD] ", animal_name,
+			" | submerged_count:", _submerged_textures.size(),
+			" | paths:", _SUBMERGED_TEXTURE_PATHS)
 
 func _configure_water_detection() -> void:
 	if not area:
 		return
+	var old_mask := area.collision_mask
 	var cfg := get_node_or_null("/root/WorldConfig")
 	if cfg and cfg.has_method("get_water_collision_layer_mask"):
 		var water_mask: int = int(cfg.get_water_collision_layer_mask())
 		area.collision_mask = area.collision_mask | water_mask
+		if DebugLogger.enabled and DebugLogger.water:
+			print("[WATER CONFIG] ", animal_name,
+				" | area:", area.name,
+				" | old_mask:", old_mask,
+				" | water_mask:", water_mask,
+				" | new_mask:", area.collision_mask)
+
+func resync_water_state(reason: String = "manual") -> void:
+	"""Recalcula sobreposição real de água e reconcilia estado FSM.
+	Útil após restore/reparent/reveal para evitar contador stale."""
+	if not area:
+		return
+	var overlap_areas := area.get_overlapping_areas()
+	var new_ids: Dictionary = {}
+	for overlap in overlap_areas:
+		var overlap_area := overlap as Area2D
+		if overlap_area and _is_water_area(overlap_area):
+			new_ids[overlap_area.get_instance_id()] = true
+	var old_count := _water_overlap_count
+	_water_overlap_ids = new_ids
+	_water_overlap_count = _water_overlap_ids.size()
+	if DebugLogger.enabled and DebugLogger.water:
+		print("[WATER RESYNC] ", animal_name,
+			" | reason:", reason,
+			" | old_count:", old_count,
+			" | new_count:", _water_overlap_count,
+			" | state_before:", AnimalState.keys()[current_state],
+			" | gpos:", global_position,
+			" | feet_y:", "%.1f" % get_feet_y())
+	_last_water_trigger = "resync:" + reason
+	if _water_overlap_count > 0 and current_state != AnimalState.SUBMERSO:
+		_enter_submerged_state()
+	elif _water_overlap_count == 0 and current_state == AnimalState.SUBMERSO:
+		_exit_submerged_state()
 
 func _on_area_area_entered(other_area: Area2D) -> void:
+	if DebugLogger.enabled and DebugLogger.water:
+		print("[WATER ENTER] ", animal_name,
+			" | trigger_area:", _describe_area(other_area),
+			" | overlap_before:", _water_overlap_count,
+			" | gpos:", global_position,
+			" | feet_y:", "%.1f" % get_feet_y(),
+			" | state:", AnimalState.keys()[current_state])
 	if not _is_water_area(other_area):
+		if DebugLogger.enabled and DebugLogger.water:
+			print("[WATER ENTER] ", animal_name, " ignored (not water)")
 		return
-	_water_overlap_count += 1
+	var area_id := other_area.get_instance_id()
+	if _water_overlap_ids.has(area_id):
+		if DebugLogger.enabled and DebugLogger.water:
+			print("[WATER ENTER] ", animal_name,
+				" | duplicate_area_id:", area_id,
+				" | zone:", other_area.name,
+				" | overlap_kept:", _water_overlap_count)
+		return
+	_last_water_trigger = "area_entered"
+	_last_water_zone_name = other_area.name if other_area else "null"
+	_water_overlap_ids[area_id] = true
+	_water_overlap_count = _water_overlap_ids.size()
+	if DebugLogger.enabled and DebugLogger.water:
+		print("[WATER ENTER] ", animal_name,
+			" | overlap_after:", _water_overlap_count,
+			" | zone:", _last_water_zone_name)
 	if _water_overlap_count == 1:
 		_enter_submerged_state()
 
 func _on_area_area_exited(other_area: Area2D) -> void:
+	if DebugLogger.enabled and DebugLogger.water:
+		print("[WATER EXIT] ", animal_name,
+			" | trigger_area:", _describe_area(other_area),
+			" | overlap_before:", _water_overlap_count,
+			" | gpos:", global_position,
+			" | feet_y:", "%.1f" % get_feet_y(),
+			" | state:", AnimalState.keys()[current_state])
 	if not _is_water_area(other_area):
+		if DebugLogger.enabled and DebugLogger.water:
+			print("[WATER EXIT] ", animal_name, " ignored (not water)")
 		return
-	_water_overlap_count = maxi(0, _water_overlap_count - 1)
+	var area_id := other_area.get_instance_id()
+	if _water_overlap_ids.has(area_id):
+		_water_overlap_ids.erase(area_id)
+	else:
+		if DebugLogger.enabled and DebugLogger.water:
+			print("[WATER EXIT] ", animal_name,
+				" | unknown_area_id:", area_id,
+				" | forcing_resync")
+		resync_water_state("unknown_exit")
+		return
+	_last_water_trigger = "area_exited"
+	_last_water_zone_name = other_area.name if other_area else "null"
+	_water_overlap_count = _water_overlap_ids.size()
+	if DebugLogger.enabled and DebugLogger.water:
+		print("[WATER EXIT] ", animal_name,
+			" | overlap_after:", _water_overlap_count,
+			" | zone:", _last_water_zone_name)
 	if _water_overlap_count == 0 and current_state == AnimalState.SUBMERSO:
 		_exit_submerged_state()
 
 func _is_water_area(other_area: Area2D) -> bool:
 	if other_area == null:
+		if DebugLogger.enabled and DebugLogger.water:
+			print("[WATER CHECK] ", animal_name, " | area=null -> false")
 		return false
 	if other_area.is_in_group("water_zones"):
+		if DebugLogger.enabled and DebugLogger.water:
+			print("[WATER CHECK] ", animal_name,
+				" | area:", _describe_area(other_area),
+				" | reason:group water_zones -> true")
 		return true
 	var cfg := get_node_or_null("/root/WorldConfig")
 	if cfg and cfg.has_method("get_water_collision_layer_mask"):
 		var water_mask: int = int(cfg.get_water_collision_layer_mask())
-		return (other_area.collision_layer & water_mask) != 0
+		var by_layer := (other_area.collision_layer & water_mask) != 0
+		if DebugLogger.enabled and DebugLogger.water:
+			print("[WATER CHECK] ", animal_name,
+				" | area:", _describe_area(other_area),
+				" | area_layer:", other_area.collision_layer,
+				" | water_mask:", water_mask,
+				" | reason:layer -> ", by_layer)
+		return by_layer
+	if DebugLogger.enabled and DebugLogger.water:
+		print("[WATER CHECK] ", animal_name,
+			" | area:", _describe_area(other_area),
+			" | reason:no config -> false")
 	return false
 
 func _enter_submerged_state() -> void:
 	if is_hidden:
+		if DebugLogger.enabled and DebugLogger.water:
+			print("[WATER FSM] ", animal_name, " blocked enter_submerged (is_hidden=true)")
 		return
 	if _submerged_textures.is_empty():
+		if DebugLogger.enabled and DebugLogger.sprite:
+			print("[SPRITE SUBMERGED] ", animal_name, " no submerged textures loaded")
 		return
 	var idx := randi() % _submerged_textures.size()
 	_current_submerged_texture = _submerged_textures[idx]
+	if DebugLogger.enabled and DebugLogger.sprite:
+		print("[SPRITE SUBMERGED PICK] ", animal_name,
+			" | idx:", idx,
+			" | path:", _current_submerged_texture.resource_path if _current_submerged_texture else "null",
+			" | trigger:", _last_water_trigger,
+			" | zone:", _last_water_zone_name)
 	transition_to(AnimalState.SUBMERSO)
 
 func _exit_submerged_state() -> void:
+	if DebugLogger.enabled and DebugLogger.water:
+		var cfg := get_node_or_null("/root/WorldConfig") as _WorldConfig
+		print("[WATER FSM EXIT] ", animal_name,
+			" | trigger:", _last_water_trigger,
+			" | zone:", _last_water_zone_name,
+			" | overlap:", _water_overlap_count,
+			" | gpos:", global_position,
+			" | feet_y:", "%.1f" % get_feet_y(),
+			" | earth_y:", "%.1f" % (cfg.background_earth_y if cfg else -9999.0),
+			" | can_fly:", can_fly,
+			" | is_dragging:", is_being_dragged,
+			" | is_hidden:", is_hidden)
 	transition_to(AnimalState.IDLE)
 	if is_being_dragged or is_hidden:
+		if DebugLogger.enabled and DebugLogger.water:
+			print("[WATER FSM EXIT] ", animal_name,
+				" | decision:IDLE (blocked by drag/hidden)")
 		return
-	apply_gravity()
+	var transitioned := apply_gravity()
+	if DebugLogger.enabled and DebugLogger.water:
+		print("[WATER FSM EXIT] ", animal_name,
+			" | apply_gravity:", transitioned,
+			" | decision_state:", AnimalState.keys()[current_state])
 
 func on_click():
 	_cancel_transition()  # Transação cancelada pelo clique; ação normal retoma
@@ -461,6 +598,13 @@ func transition_to(new_state: AnimalState) -> void:
 	var old_state := current_state
 	if DebugLogger.animal_fsm:
 		print("[FSM] ", animal_name, ": ", AnimalState.keys()[old_state], " → ", AnimalState.keys()[new_state])
+	if DebugLogger.enabled and DebugLogger.water and (old_state == AnimalState.SUBMERSO or new_state == AnimalState.SUBMERSO):
+		print("[WATER FSM] ", animal_name,
+			" | ", AnimalState.keys()[old_state], " -> ", AnimalState.keys()[new_state],
+			" | trigger:", _last_water_trigger,
+			" | zone:", _last_water_zone_name,
+			" | gpos:", global_position,
+			" | feet_y:", "%.1f" % get_feet_y())
 	_exit_state(old_state)
 	current_state = new_state
 	_enter_state(new_state)
@@ -500,6 +644,27 @@ func _enter_state(state: AnimalState) -> void:
 				sprite.texture = _current_submerged_texture
 			elif not _submerged_textures.is_empty():
 				sprite.texture = _submerged_textures[randi() % _submerged_textures.size()]
+			if DebugLogger.enabled and DebugLogger.sprite:
+				print("[SPRITE APPLY] ", animal_name,
+					" | state:SUBMERSO",
+					" | applied:", sprite.texture.resource_path if sprite and sprite.texture else "null",
+					" | trigger:", _last_water_trigger,
+					" | zone:", _last_water_zone_name,
+					" | gpos:", global_position)
+
+func _describe_area(a: Area2D) -> String:
+	if a == null:
+		return "null"
+	var parent_name := "null"
+	if a.get_parent():
+		parent_name = a.get_parent().name
+	return "%s(parent=%s, layer=%d, mask=%d, groups=%s)" % [
+		a.name,
+		parent_name,
+		a.collision_layer,
+		a.collision_mask,
+		str(a.get_groups())
+	]
 
 func _update_idle_visual() -> void:
 	"""Atualiza a textura do Sprite2D com base no estado dia/noite atual.

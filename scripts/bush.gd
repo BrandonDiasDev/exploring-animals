@@ -199,6 +199,8 @@ func reveal_animal():
 
 	animal.is_hidden = false
 	animal.visible = true
+	if animal.has_method("_configure_water_detection"):
+		animal._configure_water_detection()
 
 	# Align animal bottom to bush bottom (bottom-bottom)
 	var animal_sprite_node = animal.get_node_or_null("Sprite2D")

@@ -32,7 +32,7 @@ position = Vector2(-495, 20)
 position = Vector2(402, -95)
 
 [node name="Siriema" parent="Plane2" unique_id=342004318 instance=ExtResource("6_po3gx")]
-position = Vector2(684, -586)
+position = Vector2(580, -438)
 
 [node name="Tucano" parent="Plane2" unique_id=743364831 instance=ExtResource("7_5g626")]
 position = Vector2(-573, -517)

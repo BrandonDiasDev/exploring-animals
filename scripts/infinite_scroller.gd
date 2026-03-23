@@ -196,9 +196,12 @@ func recycle_segment(index: int, new_x: float) -> void:
 	# Save animal states preserving their WORLD positions
 	var world_manager = get_tree().get_first_node_in_group("world_manager")
 	for animal in animals_before:
-		# Normalizar para IDLE antes de salvar: FLY/FALL são estados transitórios que não devem
-		# ser persistidos. apply_gravity() no restore ativa FLY/FALL de volta, se necessário.
-		if animal.get("current_state") != null and animal.get("current_state") != Animal.AnimalState.IDLE:
+		# Normalizar para IDLE antes de salvar apenas estados transitórios aéreos.
+		# SUBMERSO deve ser preservado para evitar flapping ao reciclar segmento ainda em água.
+		if animal.get("current_state") != null and (
+			animal.get("current_state") == Animal.AnimalState.FLY
+			or animal.get("current_state") == Animal.AnimalState.FALL
+		):
 			if animal.has_method("transition_to"):
 				if DebugLogger.scroller:
 					print("[SEGMENT RECYCLE] Normalizando IDLE para ", animal.name,

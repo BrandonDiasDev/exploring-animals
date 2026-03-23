@@ -108,18 +108,42 @@ func _check_duplicate_bush_ids(wm: Node) -> void:
 	## G2 (arrastar entre segmentos com IDs colidindo).
 	if not wm.get_tree():
 		return
+	var scroller = wm.get("infinite_scroller")
+	var active_segment_ids: Dictionary = {}
+	if scroller and scroller.get("segments") != null:
+		for seg_data in scroller.segments:
+			var seg = seg_data.get("node")
+			if is_instance_valid(seg):
+				active_segment_ids[seg.get_instance_id()] = true
 	var bushes: Array = wm.get_tree().get_nodes_in_group("bushes")
 	var seen: Dictionary = {}  # bush_id -> NodePath
 	for bush: Node in bushes:
+		# Ignorar arbustos fora dos segmentos ativos (ex.: nós pendentes de queue_free
+		# durante recycle). Sem esse filtro o validador pode acusar duplicidade transitória.
+		if scroller:
+			var bush_segment := _find_segment_for_node_in_scroller(bush, scroller)
+			if not bush_segment:
+				continue
+			if not active_segment_ids.has(bush_segment.get_instance_id()):
+				continue
 		var bid: String = wm.get_bush_unique_id(bush)
 		if seen.has(bid):
 			errors.append(
-				"bush_id duplicado '%s': nós '%s' e '%s'. "
-				+ "Renomeie um deles para evitar sobrescrita de estado em bushes_state." \
+				("bush_id duplicado '%s': nós '%s' e '%s'. "
+				+ "Renomeie um deles para evitar sobrescrita de estado em bushes_state.")
 				% [bid, str(seen[bid]), str(bush.get_path())]
 			)
 		else:
 			seen[bid] = bush.get_path()
+
+
+func _find_segment_for_node_in_scroller(node: Node, scroller: Node) -> Node:
+	var current: Node = node
+	while current:
+		if current.get_parent() == scroller:
+			return current
+		current = current.get_parent()
+	return null
 
 
 # ─── Verificação 4 — flag de drag vazada ──────────────────────────────────────
@@ -145,8 +169,8 @@ func _check_drag_flag_consistency(wm: Node) -> void:
 		)
 	elif dragging.size() > 1:
 		errors.append(
-			"%d animais com is_being_dragged=true simultaneamente: %s. "
-			+ "Apenas 1 deveria estar sendo arrastado por vez." % [dragging.size(), str(dragging)]
+			("%d animais com is_being_dragged=true simultaneamente: %s. "
+			+ "Apenas 1 deveria estar sendo arrastado por vez.") % [dragging.size(), str(dragging)]
 		)
 
 
@@ -213,8 +237,8 @@ func _check_no_double_hiding(wm: Node) -> void:
 		var nid: int = hidden.get_instance_id()
 		if animal_to_bush.has(nid):
 			errors.append(
-				"Animal '%s' é current_hidden_animal de DOIS arbustos ao mesmo tempo: "
-				+ "'%s' e '%s'." % [hidden.name, animal_to_bush[nid], bush.name]
+				("Animal '%s' é current_hidden_animal de DOIS arbustos ao mesmo tempo: "
+				+ "'%s' e '%s'.") % [hidden.name, animal_to_bush[nid], bush.name]
 			)
 		else:
 			animal_to_bush[nid] = bush.name
@@ -302,9 +326,9 @@ func _check_state_count_sanity(wm: Node) -> void:
 	var WARN_THRESHOLD := 12
 	if data_count > WARN_THRESHOLD:
 		warnings.append(
-			"animals_state tem %d entradas de dados (normal ≤ %d). "
+			("animals_state tem %d entradas de dados (normal ≤ %d). "
 			+ "Possível acúmulo de IDs após múltiplas voltas. "
-			+ "Verifique IDs com '@' (Verificação 1)." % [data_count, WARN_THRESHOLD]
+			+ "Verifique IDs com '@' (Verificação 1).") % [data_count, WARN_THRESHOLD]
 		)
 
 	print("[VALIDATOR] Contagem: %d data entries, %d active_node entries em animals_state" \
@@ -332,9 +356,9 @@ func _check_allowlist_consistency(wm: Node) -> void:
 		var aname: String = hidden.get("animal_name")
 		if aname not in allowlist:
 			warnings.append(
-				"Arbusto '%s' está ocupado por '%s' (animal_name='%s') mas "
+				("Arbusto '%s' está ocupado por '%s' (animal_name='%s') mas "
 				+ "accepted_animal_names=%s não inclui esse animal. "
-				+ "Verifique a configuração da cena."
+				+ "Verifique a configuração da cena.")
 				% [bush.name, hidden.name, aname, str(allowlist)]
 			)
 

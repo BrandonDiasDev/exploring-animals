@@ -163,6 +163,8 @@ func run_all() -> void:
 	await _run("G16-D — sair da água volta para fluxo FLY/FALL/IDLE",              _g16d_exit_water_restores_flow)
 	await _run("G16-E — notify dia/noite não sobrescreve visual submerso",         _g16e_day_night_does_not_override_submerged)
 	await _run("G16-F — recycle com SUBMERSO mantém validador OK",                 _g16f_recycle_after_submerged_keeps_validator_ok)
+	await _run("G16-G — area_entered duplicado não infla overlap",                  _g16g_duplicate_enter_does_not_inflate_overlap)
+	await _run("G16-H — resync restaura SUBMERSO quando ainda em água",             _g16h_resync_restores_submerged_state)
 
 	_footer()
 
@@ -187,6 +189,8 @@ func _g1a_unique_bush_ids() -> void:
 	var seen: Dictionary = {}
 	var duplicates: Array = []
 	for bush: Node in bushes:
+		if not _is_bush_in_active_segment(bush):
+			continue
 		var bid: String = _wm.get_bush_unique_id(bush)
 		if seen.has(bid):
 			duplicates.append("%s ↔ %s" % [bid, str(bush.get_path())])
@@ -352,7 +356,7 @@ func _g3d_accept_own_origin_bush() -> void:
 	if not is_instance_valid(bush):
 		_skip_test("arbusto de origem foi destruído durante o reveal (segmento reciclado)")
 		return
-	var other_bush := _find_empty_unoccupied_bush_except(bush)
+	var other_bush := _find_empty_unoccupied_bush_except(bush, animal)
 	if not other_bush:
 		_skip_test("sem outra moita livre para testar o ciclo")
 		return
@@ -853,7 +857,7 @@ func _g11a_multihop_cycle() -> void:
 		_skip_test("animal não estava livre após reveal de A")
 		return
 
-	var bush_b := _find_empty_unoccupied_bush_except(bush_a)
+	var bush_b := _find_empty_unoccupied_bush_except(bush_a, animal)
 	if not bush_b:
 		_skip_test("sem outra moita livre para o hop 2")
 		return
@@ -2201,6 +2205,60 @@ func _g16f_recycle_after_submerged_keeps_validator_ok() -> void:
 	await get_tree().process_frame
 
 
+func _g16g_duplicate_enter_does_not_inflate_overlap() -> void:
+	var dummy := _instantiate_dummy_animal("__test_g16g__")
+	if not dummy:
+		_skip_test("não foi possível criar animal de teste")
+		return
+	var zone := _instantiate_test_water_zone(dummy.global_position)
+	if not zone:
+		dummy.queue_free()
+		_skip_test("não foi possível criar water zone de teste")
+		return
+
+	dummy._on_area_area_entered(zone)
+	dummy._on_area_area_entered(zone)
+	_assert(dummy.current_state == Animal.AnimalState.SUBMERSO,
+		"com entrada duplicada, estado deve permanecer SUBMERSO")
+	_assert(dummy._water_overlap_count == 1,
+		"entrada duplicada não deve inflar overlap_count (esperado 1, atual=%d)" % dummy._water_overlap_count)
+
+	zone.queue_free()
+	dummy.queue_free()
+	await get_tree().process_frame
+
+
+func _g16h_resync_restores_submerged_state() -> void:
+	var dummy := _instantiate_dummy_animal("__test_g16h__")
+	if not dummy:
+		_skip_test("não foi possível criar animal de teste")
+		return
+	var zone := _instantiate_test_water_zone(dummy.global_position)
+	if not zone:
+		dummy.queue_free()
+		_skip_test("não foi possível criar water zone de teste")
+		return
+
+	dummy._on_area_area_entered(zone)
+	_assert(dummy.current_state == Animal.AnimalState.SUBMERSO,
+		"pré-condição: animal deveria estar SUBMERSO")
+
+	# Simula dessicronização de FSM (ex.: normalização indevida durante recycle)
+	dummy.transition_to(Animal.AnimalState.IDLE)
+	dummy._water_overlap_count = 0
+	dummy._water_overlap_ids.clear()
+	dummy.resync_water_state("test_g16h")
+
+	_assert(dummy.current_state == Animal.AnimalState.SUBMERSO,
+		"resync deveria restaurar SUBMERSO quando ainda existe overlap de água")
+	_assert(dummy._water_overlap_count == 1,
+		"resync deveria recomputar overlap_count=1 (atual=%d)" % dummy._water_overlap_count)
+
+	zone.queue_free()
+	dummy.queue_free()
+	await get_tree().process_frame
+
+
 # ── Helpers de busca ──────────────────────────────────────────────────────────
 
 func _create_colored_texture(width: int, height: int, color: Color) -> Texture2D:
@@ -2288,10 +2346,18 @@ func _find_empty_unoccupied_bush() -> Node:
 	return null
 
 
-func _find_empty_unoccupied_bush_except(excluded: Node) -> Node:
+func _find_empty_unoccupied_bush_except(excluded: Node, animal: Node = null) -> Node:
 	for b: Node in get_tree().get_nodes_in_group("bushes"):
 		var is_excluded := is_instance_valid(excluded) and b == excluded
-		if not is_excluded and not b.get("is_occupied") and not b.get("is_revealed"):
+		if is_excluded or b.get("is_occupied") or b.get("is_revealed"):
+			continue
+		# Se o arbusto usa allowlist, só retornar quando o animal atual for compatível.
+		if animal:
+			var allowlist: Array = b.get("accepted_animal_names")
+			if allowlist != null and allowlist.size() > 0:
+				var aname: String = str(animal.get("animal_name"))
+				if aname not in allowlist:
+					continue
 			return b
 	return null
 
@@ -2348,6 +2414,23 @@ func _instantiate_test_water_zone(global_pos: Vector2) -> Area2D:
 	add_child(zone)
 	zone.global_position = global_pos
 	return zone
+
+
+func _is_bush_in_active_segment(bush: Node) -> bool:
+	if not _wm:
+		return false
+	var scroller = _wm.get("infinite_scroller")
+	if not scroller:
+		return true
+	if not _wm.has_method("get_node_or_null_in_parents"):
+		return true
+	var seg: Node2D = _wm.get_node_or_null_in_parents(bush)
+	if not seg:
+		return false
+	for seg_data in scroller.segments:
+		if seg_data.get("node") == seg:
+			return true
+	return false
 
 
 # ── Infraestrutura de assert / report ─────────────────────────────────────────

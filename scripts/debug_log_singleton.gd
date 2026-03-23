@@ -42,6 +42,12 @@ var sun_moon: bool = false
 ## FSM do animal: transition_to, _enter/_exit_state, idle_visual (awake/sleep).
 var animal_fsm: bool = false
 
+## Água/submerso: detecção de trigger, overlap, decisões de transição e contexto posicional.
+var water: bool = true
+
+## Troca de sprite: seleção/aplicação de textura (inclui submerso).
+var sprite: bool = true
+
 ## Nuvens/parallax: spawn, reset, wrap, direção, bounds, camada e skyline.
 var clouds: bool = true
 
@@ -64,6 +70,8 @@ func enable_all() -> void:
 	hole = true
 	sun_moon = true
 	animal_fsm = true
+	water = true
+	sprite = true
 	clouds = true
 	debug_input = true
 
@@ -80,6 +88,8 @@ func disable_all() -> void:
 	hole = false
 	sun_moon = false
 	animal_fsm = false
+	water = false
+	sprite = false
 	clouds = false
 	debug_input = false
 
@@ -97,6 +107,8 @@ func get_category(category: String) -> bool:
 		"hole": return hole
 		"sun_moon": return sun_moon
 		"animal_fsm": return animal_fsm
+		"water": return water
+		"sprite": return sprite
 		"clouds": return clouds
 		"debug_input": return debug_input
 	return false
@@ -115,5 +127,7 @@ func set_category(category: String, value: bool) -> void:
 		"hole": hole = value
 		"sun_moon": sun_moon = value
 		"animal_fsm": animal_fsm = value
+		"water": water = value
+		"sprite": sprite = value
 		"clouds": clouds = value
 		"debug_input": debug_input = value
