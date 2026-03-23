@@ -8,6 +8,14 @@
 [ext_resource type="PackedScene" uid="uid://b26y5t483lssx" path="res://scenes/components/onca.tscn" id="6_ii7p1"]
 [ext_resource type="Script" uid="uid://chjdudqckkvp" path="res://scripts/world_segment.gd" id="seg_script"]
 
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_ii7p1"]
+radius = 98.0
+height = 457.89514
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_u2ayi"]
+radius = 67.0
+height = 170.0
+
 [node name="WorldSegment2" type="Node2D" unique_id=1993288249]
 script = ExtResource("seg_script")
 metadata/_edit_horizontal_guides_ = [702.0, -711.0]
@@ -20,6 +28,22 @@ texture = ExtResource("2_gcobr")
 modulate = Color(1, 1, 1, 0)
 z_index = -10
 texture = ExtResource("3_ihu6p")
+
+[node name="WaterZoneLake01" type="Area2D" parent="." unique_id=2106209719]
+position = Vector2(424, -132)
+collision_layer = 128
+collision_mask = 0
+input_pickable = false
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WaterZoneLake01" unique_id=429592112]
+position = Vector2(310, -165)
+rotation = -1.7472314
+shape = SubResource("CapsuleShape2D_ii7p1")
+
+[node name="CollisionShape2D2" type="CollisionShape2D" parent="WaterZoneLake01" unique_id=290156779]
+position = Vector2(462, 371)
+rotation = 0.7046718
+shape = SubResource("CapsuleShape2D_u2ayi")
 
 [node name="Plane2" type="Node2D" parent="." unique_id=1908866073]
 z_as_relative = false

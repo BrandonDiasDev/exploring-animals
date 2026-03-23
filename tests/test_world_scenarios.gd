@@ -156,6 +156,14 @@ func run_all() -> void:
 	await _run("G15-D — acima do chão ainda dispara transição válida",             _g15d_negative_control_above_ground)
 	await _run("G15-E — notify dia/noite + recycle preserva IDLE no chão",         _g15e_day_night_notify_then_recycle)
 
+	# ── Grupo 16: Água / Submerso ───────────────────────────────────────────────
+	await _run("G16-A — entrar em water zone muda para SUBMERSO",                  _g16a_enter_water_sets_submerso)
+	await _run("G16-B — textura submersa vem de assets/extras",                    _g16b_submerged_texture_from_extras)
+	await _run("G16-C — múltiplas entradas mantêm textura válida",                 _g16c_reentry_keeps_valid_submerged_texture)
+	await _run("G16-D — sair da água volta para fluxo FLY/FALL/IDLE",              _g16d_exit_water_restores_flow)
+	await _run("G16-E — notify dia/noite não sobrescreve visual submerso",         _g16e_day_night_does_not_override_submerged)
+	await _run("G16-F — recycle com SUBMERSO mantém validador OK",                 _g16f_recycle_after_submerged_keeps_validator_ok)
+
 	_footer()
 
 
@@ -1993,6 +2001,206 @@ func _g15e_day_night_notify_then_recycle() -> void:
 	cfg.is_day = orig_is_day
 
 
+# ── Grupo 16: Água / Submerso ─────────────────────────────────────────────────
+
+func _g16a_enter_water_sets_submerso() -> void:
+	var dummy := _instantiate_dummy_animal("__test_g16a__")
+	if not dummy:
+		_skip_test("não foi possível criar animal de teste")
+		return
+	var zone := _instantiate_test_water_zone(dummy.global_position)
+	if not zone:
+		dummy.queue_free()
+		_skip_test("não foi possível criar water zone de teste")
+		return
+
+	dummy._on_area_area_entered(zone)
+	_assert(dummy.current_state == Animal.AnimalState.SUBMERSO,
+		"ao entrar na água, estado esperado SUBMERSO")
+
+	zone.queue_free()
+	dummy.queue_free()
+	await get_tree().process_frame
+
+
+func _g16b_submerged_texture_from_extras() -> void:
+	var dummy := _instantiate_dummy_animal("__test_g16b__")
+	if not dummy:
+		_skip_test("não foi possível criar animal de teste")
+		return
+	var zone := _instantiate_test_water_zone(dummy.global_position)
+	if not zone:
+		dummy.queue_free()
+		_skip_test("não foi possível criar water zone de teste")
+		return
+
+	dummy._on_area_area_entered(zone)
+	var sprite := dummy.get_node_or_null("Sprite2D") as Sprite2D
+	var valid_paths := {
+		"res://assets/extras/olhin-1.png": true,
+		"res://assets/extras/olhin-2.png": true,
+		"res://assets/extras/olhin-3.png": true,
+		"res://assets/extras/olhin-4.png": true,
+	}
+	var tex_path := sprite.texture.resource_path if sprite and sprite.texture else ""
+	_assert(valid_paths.has(tex_path),
+		"textura submersa deve vir de assets/extras/olhin-[1..4].png, atual='%s'" % tex_path)
+
+	zone.queue_free()
+	dummy.queue_free()
+	await get_tree().process_frame
+
+
+func _g16c_reentry_keeps_valid_submerged_texture() -> void:
+	var dummy := _instantiate_dummy_animal("__test_g16c__")
+	if not dummy:
+		_skip_test("não foi possível criar animal de teste")
+		return
+	var zone := _instantiate_test_water_zone(dummy.global_position)
+	if not zone:
+		dummy.queue_free()
+		_skip_test("não foi possível criar water zone de teste")
+		return
+
+	var valid_paths := {
+		"res://assets/extras/olhin-1.png": true,
+		"res://assets/extras/olhin-2.png": true,
+		"res://assets/extras/olhin-3.png": true,
+		"res://assets/extras/olhin-4.png": true,
+	}
+	var all_valid := true
+	for _i in range(6):
+		dummy._on_area_area_entered(zone)
+		var sprite := dummy.get_node_or_null("Sprite2D") as Sprite2D
+		var tex_path := sprite.texture.resource_path if sprite and sprite.texture else ""
+		if not valid_paths.has(tex_path):
+			all_valid = false
+		dummy._on_area_area_exited(zone)
+
+	_assert(all_valid, "todas as entradas na água devem usar uma textura válida de extras")
+
+	zone.queue_free()
+	dummy.queue_free()
+	await get_tree().process_frame
+
+
+func _g16d_exit_water_restores_flow() -> void:
+	var cfg := get_node_or_null("/root/WorldConfig")
+	if not cfg:
+		_skip_test("WorldConfig não disponível")
+		return
+
+	# Caso 1: can_fly=true e acima do chão -> FLY
+	var fly_dummy := _instantiate_dummy_animal("__test_g16d_fly__")
+	var zone1 := _instantiate_test_water_zone(Vector2.ZERO)
+	if not fly_dummy or not zone1:
+		if fly_dummy: fly_dummy.queue_free()
+		if zone1: zone1.queue_free()
+		_skip_test("falha ao criar fixtures do caso FLY")
+		return
+	fly_dummy.can_fly = true
+	fly_dummy.position.y = cfg.background_earth_y - 300.0
+	fly_dummy._on_area_area_entered(zone1)
+	fly_dummy._on_area_area_exited(zone1)
+	_assert(fly_dummy.current_state == Animal.AnimalState.FLY,
+		"ao sair da água acima do chão com can_fly=true, esperado FLY")
+
+	# Caso 2: can_fly=false e acima do chão -> FALL
+	var fall_dummy := _instantiate_dummy_animal("__test_g16d_fall__")
+	var zone2 := _instantiate_test_water_zone(Vector2.ZERO)
+	if not fall_dummy or not zone2:
+		fly_dummy.queue_free()
+		zone1.queue_free()
+		if fall_dummy: fall_dummy.queue_free()
+		if zone2: zone2.queue_free()
+		_skip_test("falha ao criar fixtures do caso FALL")
+		return
+	fall_dummy.can_fly = false
+	fall_dummy.position.y = cfg.background_earth_y - 300.0
+	fall_dummy._on_area_area_entered(zone2)
+	fall_dummy._on_area_area_exited(zone2)
+	_assert(fall_dummy.current_state == Animal.AnimalState.FALL,
+		"ao sair da água acima do chão com can_fly=false, esperado FALL")
+
+	# Caso 3: no chão -> IDLE
+	var idle_dummy := _instantiate_dummy_animal("__test_g16d_idle__")
+	var zone3 := _instantiate_test_water_zone(Vector2.ZERO)
+	if not idle_dummy or not zone3:
+		fly_dummy.queue_free()
+		zone1.queue_free()
+		fall_dummy.queue_free()
+		zone2.queue_free()
+		if idle_dummy: idle_dummy.queue_free()
+		if zone3: zone3.queue_free()
+		_skip_test("falha ao criar fixtures do caso IDLE")
+		return
+	idle_dummy.can_fly = true
+	idle_dummy.position.y = cfg.background_earth_y + 240.0
+	idle_dummy._on_area_area_entered(zone3)
+	idle_dummy._on_area_area_exited(zone3)
+	_assert(idle_dummy.current_state == Animal.AnimalState.IDLE,
+		"ao sair da água no chão, esperado IDLE")
+
+	zone1.queue_free()
+	zone2.queue_free()
+	zone3.queue_free()
+	fly_dummy.queue_free()
+	fall_dummy.queue_free()
+	idle_dummy.queue_free()
+	await get_tree().process_frame
+
+
+func _g16e_day_night_does_not_override_submerged() -> void:
+	var dummy := _instantiate_dummy_animal("__test_g16e__")
+	if not dummy:
+		_skip_test("não foi possível criar animal de teste")
+		return
+	var zone := _instantiate_test_water_zone(dummy.global_position)
+	if not zone:
+		dummy.queue_free()
+		_skip_test("não foi possível criar water zone de teste")
+		return
+
+	dummy._on_area_area_entered(zone)
+	var sprite := dummy.get_node_or_null("Sprite2D") as Sprite2D
+	var before_path := sprite.texture.resource_path if sprite and sprite.texture else ""
+	dummy.notify_day_night_changed(false)
+	var after_path := sprite.texture.resource_path if sprite and sprite.texture else ""
+	_assert(dummy.current_state == Animal.AnimalState.SUBMERSO,
+		"animal deveria permanecer em SUBMERSO durante notify_day_night_changed")
+	_assert(before_path == after_path,
+		"notify_day_night_changed não deve trocar textura enquanto SUBMERSO")
+
+	zone.queue_free()
+	dummy.queue_free()
+	await get_tree().process_frame
+
+
+func _g16f_recycle_after_submerged_keeps_validator_ok() -> void:
+	var animal := _find_free_animal()
+	if not animal:
+		_skip_test("nenhum animal livre disponível")
+		return
+
+	var zone := _instantiate_test_water_zone(animal.global_position)
+	if not zone:
+		_skip_test("não foi possível criar water zone de teste")
+		return
+
+	animal._on_area_area_entered(zone)
+	_assert(animal.current_state == Animal.AnimalState.SUBMERSO,
+		"pré-condição: animal deve entrar em SUBMERSO antes do recycle")
+
+	var recycled := await _recycle_segment_containing_animal(animal)
+	_assert(recycled, "não foi possível reciclar segmento no cenário G16-F")
+
+	var ok: bool = _validator.validate(_wm, "G16-F após recycle com SUBMERSO")
+	_assert(ok, "validador falhou após recycle com animal submerso")
+
+	zone.queue_free()
+	await get_tree().process_frame
+
+
 # ── Helpers de busca ──────────────────────────────────────────────────────────
 
 func _create_colored_texture(width: int, height: int, color: Color) -> Texture2D:
@@ -2114,6 +2322,32 @@ func _instantiate_test_bush() -> Node:
 	node.name = "__test_bush__"
 	add_child(node)
 	return node
+
+
+func _instantiate_test_water_zone(global_pos: Vector2) -> Area2D:
+	var zone := Area2D.new()
+	zone.name = "__test_water_zone__"
+	zone.input_pickable = false
+	zone.monitoring = true
+	zone.monitorable = true
+	zone.add_to_group("water_zones")
+
+	var cfg := get_node_or_null("/root/WorldConfig")
+	var water_mask := 1 << 7
+	if cfg and cfg.has_method("get_water_collision_layer_mask"):
+		water_mask = int(cfg.get_water_collision_layer_mask())
+	zone.collision_layer = water_mask
+	zone.collision_mask = 0
+
+	var shape := CollisionShape2D.new()
+	var rect := RectangleShape2D.new()
+	rect.size = Vector2(200.0, 120.0)
+	shape.shape = rect
+	zone.add_child(shape)
+
+	add_child(zone)
+	zone.global_position = global_pos
+	return zone
 
 
 # ── Infraestrutura de assert / report ─────────────────────────────────────────

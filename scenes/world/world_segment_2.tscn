@@ -9,7 +9,7 @@
 [ext_resource type="PackedScene" uid="uid://dgcc6rc7ago21" path="res://scenes/components/tucano.tscn" id="7_5g626"]
 [ext_resource type="Script" uid="uid://chjdudqckkvp" path="res://scripts/world_segment.gd" id="seg_script"]
 
-[node name="WorldSegment" type="Node2D" unique_id=1767376223]
+[node name="WorldSegment2" type="Node2D" unique_id=1767376223]
 script = ExtResource("seg_script")
 metadata/_edit_horizontal_guides_ = [700.0, -701.0]
 

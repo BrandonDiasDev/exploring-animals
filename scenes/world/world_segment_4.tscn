@@ -6,6 +6,18 @@
 [ext_resource type="PackedScene" uid="uid://yaesi0g721pt" path="res://scenes/components/pato.tscn" id="5_x45xy"]
 [ext_resource type="Script" uid="uid://chjdudqckkvp" path="res://scripts/world_segment.gd" id="seg_script"]
 
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_water_seg4"]
+size = Vector2(1811, 196)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_x45xy"]
+size = Vector2(1895.5, 490)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_n6qgo"]
+size = Vector2(1242, 231)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_ovs8f"]
+size = Vector2(12.685201, 38.472588)
+
 [node name="WorldSegment" type="Node2D" unique_id=817559777]
 script = ExtResource("seg_script")
 metadata/_edit_horizontal_guides_ = [699.0, -701.0]
@@ -19,11 +31,34 @@ modulate = Color(1, 1, 1, 0)
 z_index = -10
 texture = ExtResource("3_lfylt")
 
+[node name="WaterZoneLake01" type="Area2D" parent="." unique_id=1267382341]
+position = Vector2(-744, -240)
+collision_layer = 128
+collision_mask = 0
+input_pickable = false
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="WaterZoneLake01" unique_id=2064193707]
+position = Vector2(690.5, -66)
+shape = SubResource("RectangleShape2D_water_seg4")
+
+[node name="CollisionShape2D2" type="CollisionShape2D" parent="WaterZoneLake01" unique_id=39086005]
+position = Vector2(746.25, 532)
+shape = SubResource("RectangleShape2D_x45xy")
+
+[node name="CollisionShape2D3" type="CollisionShape2D" parent="WaterZoneLake01" unique_id=1908261950]
+position = Vector2(793, 156.5)
+shape = SubResource("RectangleShape2D_n6qgo")
+
+[node name="CollisionShape2D4" type="CollisionShape2D" parent="WaterZoneLake01" unique_id=1041006214]
+position = Vector2(963.5, 821)
+scale = Vector2(114.06992, -1.6635188)
+shape = SubResource("RectangleShape2D_ovs8f")
+
 [node name="Plane2" type="Node2D" parent="." unique_id=572081845]
 z_as_relative = false
 
 [node name="Pato" parent="Plane2" unique_id=342004318 instance=ExtResource("5_x45xy")]
-position = Vector2(-829, -220)
+position = Vector2(-891, -83)
 
 [node name="Plane1" type="Node2D" parent="." unique_id=1453074001]
 z_index = 10

@@ -114,3 +114,15 @@ var is_day: bool = true
 
 ## Duração padrão de voo (segundos) — fallback quando a cena do animal não sobrescreve fly_duration.
 @export var default_fly_duration: float = 5.0
+
+# ── Água / colisão (submerso) ───────────────────────────────────────────────
+## Número da layer de física 2D usada para áreas de água (1..32).
+## Recomenda-se manter um valor alto para evitar conflito com layers existentes.
+@export_range(1, 32, 1) var water_collision_layer_number: int = 8
+
+## Se verdadeiro, água deve ser marcada no cenário com Area2D no grupo "water_zones".
+## Isso permite detectar água mesmo quando o level design usa máscara customizada.
+@export var water_detection_uses_group: bool = true
+
+func get_water_collision_layer_mask() -> int:
+	return 1 << (water_collision_layer_number - 1)

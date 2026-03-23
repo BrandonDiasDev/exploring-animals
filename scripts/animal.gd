@@ -3,7 +3,14 @@ class_name Animal
 
 const _WorldConfig := preload("res://scripts/world_config.gd")
 
-enum AnimalState { IDLE, FLY, FALL }
+enum AnimalState { IDLE, FLY, FALL, SUBMERSO }
+
+const _SUBMERGED_TEXTURE_PATHS: Array[String] = [
+	"res://assets/extras/olhin-1.png",
+	"res://assets/extras/olhin-2.png",
+	"res://assets/extras/olhin-3.png",
+	"res://assets/extras/olhin-4.png",
+]
 
 signal animal_clicked(animal: Animal)
 signal animal_drag_started(animal: Animal)
@@ -44,6 +51,9 @@ var mouse_captured := false
 var current_state: AnimalState = AnimalState.IDLE
 var _fly_timer: float = 0.0
 var fall_tween: Tween = null
+var _submerged_textures: Array[Texture2D] = []
+var _current_submerged_texture: Texture2D = null
+var _water_overlap_count: int = 0
 ## Textura padrão capturada da cena em _ready(); usada como fallback de IDLE.
 var _default_idle_texture: Texture2D = null
 ## Duração em segundos que o animal permanece acordado após ser perturbado (durante o período de sono).
@@ -56,10 +66,14 @@ func _ready():
 	add_to_group("animals")
 	
 	area.input_event.connect(_on_area_input_event)
+	area.area_entered.connect(_on_area_area_entered)
+	area.area_exited.connect(_on_area_area_exited)
 	original_position = position
 	
 	# Capturar textura padrão da cena antes de qualquer override FSM.
 	_default_idle_texture = sprite.texture
+	_load_submerged_textures()
+	_configure_water_detection()
 	
 	if is_hidden:
 		visible = false
@@ -176,6 +190,61 @@ func _process(delta):
 			_wake_timer = 0.0
 			if current_state == AnimalState.IDLE:
 				_update_idle_visual()
+
+func _load_submerged_textures() -> void:
+	_submerged_textures.clear()
+	for path in _SUBMERGED_TEXTURE_PATHS:
+		var tex := load(path) as Texture2D
+		if tex != null:
+			_submerged_textures.append(tex)
+
+func _configure_water_detection() -> void:
+	if not area:
+		return
+	var cfg := get_node_or_null("/root/WorldConfig")
+	if cfg and cfg.has_method("get_water_collision_layer_mask"):
+		var water_mask: int = int(cfg.get_water_collision_layer_mask())
+		area.collision_mask = area.collision_mask | water_mask
+
+func _on_area_area_entered(other_area: Area2D) -> void:
+	if not _is_water_area(other_area):
+		return
+	_water_overlap_count += 1
+	if _water_overlap_count == 1:
+		_enter_submerged_state()
+
+func _on_area_area_exited(other_area: Area2D) -> void:
+	if not _is_water_area(other_area):
+		return
+	_water_overlap_count = maxi(0, _water_overlap_count - 1)
+	if _water_overlap_count == 0 and current_state == AnimalState.SUBMERSO:
+		_exit_submerged_state()
+
+func _is_water_area(other_area: Area2D) -> bool:
+	if other_area == null:
+		return false
+	if other_area.is_in_group("water_zones"):
+		return true
+	var cfg := get_node_or_null("/root/WorldConfig")
+	if cfg and cfg.has_method("get_water_collision_layer_mask"):
+		var water_mask: int = int(cfg.get_water_collision_layer_mask())
+		return (other_area.collision_layer & water_mask) != 0
+	return false
+
+func _enter_submerged_state() -> void:
+	if is_hidden:
+		return
+	if _submerged_textures.is_empty():
+		return
+	var idx := randi() % _submerged_textures.size()
+	_current_submerged_texture = _submerged_textures[idx]
+	transition_to(AnimalState.SUBMERSO)
+
+func _exit_submerged_state() -> void:
+	transition_to(AnimalState.IDLE)
+	if is_being_dragged or is_hidden:
+		return
+	apply_gravity()
 
 func on_click():
 	_cancel_transition()  # Transação cancelada pelo clique; ação normal retoma
@@ -406,6 +475,8 @@ func _exit_state(state: AnimalState) -> void:
 			fall_tween = null
 		AnimalState.FLY:
 			_fly_timer = 0.0
+		AnimalState.SUBMERSO:
+			pass
 		AnimalState.IDLE:
 			pass  # sem cleanup necessário
 
@@ -424,6 +495,11 @@ func _enter_state(state: AnimalState) -> void:
 			if fall_texture != null:
 				sprite.texture = fall_texture
 			_start_fall_tween()
+		AnimalState.SUBMERSO:
+			if _current_submerged_texture != null:
+				sprite.texture = _current_submerged_texture
+			elif not _submerged_textures.is_empty():
+				sprite.texture = _submerged_textures[randi() % _submerged_textures.size()]
 
 func _update_idle_visual() -> void:
 	"""Atualiza a textura do Sprite2D com base no estado dia/noite atual.

@@ -397,7 +397,7 @@ func _check_fsm_no_fly_for_ground(wm: Node) -> void:
 
 # ─── Verificação 14 — valor do enum FSM é válido ─────────────────────────────
 func _check_fsm_state_valid(wm: Node) -> void:
-	## current_state deve ser um valor válido de AnimalState: 0 (IDLE), 1 (FLY) ou 2 (FALL).
+	## current_state deve ser um valor válido de AnimalState: 0 (IDLE), 1 (FLY), 2 (FALL) ou 3 (SUBMERSO).
 	## Valor inválido indica corrupção (ex: atribuição direta sem passar por transition_to).
 	var animals_state: Dictionary = wm.animals_state
 	for key: String in animals_state.keys():
@@ -409,9 +409,9 @@ func _check_fsm_state_valid(wm: Node) -> void:
 		var fsm_state = node.get("current_state")
 		if fsm_state == null:
 			continue  # Script sem FSM — pular
-		if not (fsm_state == 0 or fsm_state == 1 or fsm_state == 2):
+		if not (fsm_state == 0 or fsm_state == 1 or fsm_state == 2 or fsm_state == 3):
 			errors.append(
-				"'%s' tem current_state=%s que não é um valor válido de AnimalState (0, 1, 2). "
+				"'%s' tem current_state=%s que não é um valor válido de AnimalState (0, 1, 2, 3). "
 				% [key.trim_suffix("_active_node"), str(fsm_state)]
 				+ "Atribuição direta ao campo sem usar transition_to()?"
 			)
