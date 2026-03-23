@@ -5,6 +5,8 @@
 [ext_resource type="PackedScene" uid="uid://b2xk5k78by648" path="res://scenes/components/bush01.tscn" id="4_ccvav"]
 [ext_resource type="PackedScene" uid="uid://c56qu60hhfqpm" path="res://scenes/components/hole01.tscn" id="5_8wsw7"]
 [ext_resource type="PackedScene" uid="uid://bie6nmplbk270" path="res://scenes/components/bush09.tscn" id="6_5p0bt"]
+[ext_resource type="PackedScene" uid="uid://6c0sosp5023h" path="res://scenes/components/siriema.tscn" id="6_po3gx"]
+[ext_resource type="PackedScene" uid="uid://dgcc6rc7ago21" path="res://scenes/components/tucano.tscn" id="7_5g626"]
 [ext_resource type="Script" uid="uid://chjdudqckkvp" path="res://scripts/world_segment.gd" id="seg_script"]
 
 [node name="WorldSegment" type="Node2D" unique_id=1767376223]
@@ -26,13 +28,19 @@ z_as_relative = false
 [node name="Bush01" parent="Plane2" unique_id=70398715 instance=ExtResource("4_ccvav")]
 position = Vector2(-495, 20)
 
-[node name="Hole01" parent="Plane2/Bush01" unique_id=1160025278 instance=ExtResource("5_8wsw7")]
-position = Vector2(897, -115)
+[node name="Hole01" parent="Plane2" unique_id=1160025278 instance=ExtResource("5_8wsw7")]
+position = Vector2(402, -95)
 
-[node name="Bush" parent="Plane2/Bush01" unique_id=2040923665 instance=ExtResource("6_5p0bt")]
-position = Vector2(1260, 355)
-accepted_animal_names = Array[String](["Pato", "Tamandua", "Capivara"])
+[node name="Siriema" parent="Plane2" unique_id=342004318 instance=ExtResource("6_po3gx")]
+position = Vector2(684, -586)
+
+[node name="Tucano" parent="Plane2" unique_id=743364831 instance=ExtResource("7_5g626")]
+position = Vector2(-573, -517)
 
 [node name="Plane1" type="Node2D" parent="." unique_id=1304941121]
 z_index = 10
 z_as_relative = false
+
+[node name="Bush" parent="Plane1" unique_id=2040923665 instance=ExtResource("6_5p0bt")]
+position = Vector2(765, 375)
+accepted_animal_names = Array[String](["Pato", "Tamandua", "Capivara"])

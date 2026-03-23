@@ -1,12 +1,13 @@
 [gd_scene format=3 uid="uid://bxwcxrsd0eubi"]
 
-[ext_resource type="PackedScene" uid="uid://cqbwu75urmps8" path="res://scenes/components/capivara.tscn" id="2_kgxi7"]
 [ext_resource type="Texture2D" uid="uid://mlwg8so4w7vx" path="res://assets/backgrounds/1-day.png" id="2_odnmx"]
 [ext_resource type="Texture2D" uid="uid://6mtsq6ta1qou" path="res://assets/backgrounds/1-night.png" id="3_xb33a"]
 [ext_resource type="PackedScene" uid="uid://wmaxxj2rmo7u" path="res://scenes/components/bush03.tscn" id="4_08fmt"]
 [ext_resource type="PackedScene" uid="uid://ibxmkrl1bu25" path="res://scenes/components/bush04.tscn" id="4_a5fif"]
+[ext_resource type="PackedScene" uid="uid://c1iexdg6a6nfx" path="res://scenes/components/uruatu.tscn" id="5_0hkvh"]
 [ext_resource type="PackedScene" uid="uid://brjgm5r7cqny8" path="res://scenes/components/tamandua.tscn" id="5_a5fif"]
 [ext_resource type="PackedScene" uid="uid://b7koigpx3gwb1" path="res://scenes/components/bush08.tscn" id="8_a5fif"]
+[ext_resource type="PackedScene" uid="uid://cbvojaadefq5n" path="res://scenes/components/coruja.tscn" id="9_b60o7"]
 [ext_resource type="Script" uid="uid://chjdudqckkvp" path="res://scripts/world_segment.gd" id="seg_script"]
 
 [node name="WorldSegment" type="Node2D" unique_id=817559777]
@@ -28,12 +29,12 @@ z_as_relative = false
 [node name="Bush04" parent="Plane2" unique_id=70398715 instance=ExtResource("4_a5fif")]
 position = Vector2(-360, -399)
 
+[node name="Uruatu" parent="Plane2" unique_id=342004318 instance=ExtResource("5_0hkvh")]
+position = Vector2(-818, -171)
+
 [node name="Plane1" type="Node2D" parent="." unique_id=1453074001]
 z_index = 10
 z_as_relative = false
-
-[node name="Capivara" parent="Plane1" unique_id=2114954864 instance=ExtResource("2_kgxi7")]
-position = Vector2(-802, 574)
 
 [node name="Bush03" parent="Plane1" unique_id=2048446834 instance=ExtResource("4_08fmt")]
 position = Vector2(906, 474)
@@ -42,3 +43,6 @@ hidden_animal_scene = ExtResource("5_a5fif")
 [node name="Bush09" parent="Plane1" unique_id=1693955673 instance=ExtResource("8_a5fif")]
 position = Vector2(-151, 323)
 accepted_animal_names = Array[String](["Capivara", "Tamandua"])
+
+[node name="Coruja" parent="Plane1" unique_id=1028651052 instance=ExtResource("9_b60o7")]
+position = Vector2(-734, 595)
