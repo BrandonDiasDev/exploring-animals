@@ -80,7 +80,7 @@ extends Node
 
 # ── Nuvens (parallax) ─────────────────────────────────────────────────────────
 ## Quantidade de nuvens ativas na camada global.
-@export_range(1, 32, 1) var cloud_count: int = 8
+@export_range(1, 32, 1) var cloud_count: int = 6
 
 ## Velocidade horizontal mínima/máxima das nuvens (px/s).
 @export var cloud_speed_min: float = 18.0
