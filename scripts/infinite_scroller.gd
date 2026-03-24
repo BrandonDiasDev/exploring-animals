@@ -118,6 +118,24 @@ func _set_index_label(segment_node: Node2D) -> void:
 		segment_node.add_child(lbl)
 	var slot := int(segment_node.get_meta("scene_index", -1))
 	lbl.text = "%d" % slot
+	lbl.visible = _should_show_debug_index_labels()
+
+func _should_show_debug_index_labels() -> bool:
+	var cfg := get_node_or_null("/root/WorldConfig")
+	if cfg == null:
+		# Fallback para preservar comportamento anterior em contextos sem WorldConfig.
+		return true
+	return cfg.debug_visuals_enabled
+
+func refresh_debug_index_labels_visibility() -> void:
+	var should_show := _should_show_debug_index_labels()
+	for segment_data in segments:
+		var segment_node: Node2D = segment_data.get("node", null)
+		if not is_instance_valid(segment_node):
+			continue
+		var lbl: Label = segment_node.get_node_or_null("_DebugIndexLabel")
+		if lbl:
+			lbl.visible = should_show
 
 func find_bushes_recursive(node, bushes_array):
 	if not is_instance_valid(node):

@@ -112,10 +112,33 @@ func _refresh_all() -> void:
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		var is_f1: bool = event.keycode == KEY_F1 or event.physical_keycode == KEY_F1
+		var is_f2: bool = event.keycode == KEY_F2 or event.physical_keycode == KEY_F2
 		if is_f1 and DebugLogger.enabled and DebugLogger.debug_input:
 			print("[DBG OVERLAY _input] F1 received | keycode:", event.keycode,
 				" | physical:", event.physical_keycode,
 				" | panel_visible:", _panel.visible)
+		if is_f2:
+			_toggle_debug_visuals()
+			get_viewport().set_input_as_handled()
+			return
+
+func _toggle_debug_visuals() -> void:
+	var new_state: bool = not WorldConfig.debug_visuals_enabled
+	WorldConfig.debug_visuals_enabled = new_state
+	if new_state:
+		# F2 deve conseguir ligar o overlay mesmo quando o default inicia totalmente OFF.
+		WorldConfig.show_plane_guide = true
+
+	var plane_guide_control := get_node_or_null("/root/World/PlaneGuide/Control") as Control
+	if plane_guide_control:
+		plane_guide_control.queue_redraw()
+
+	var infinite_scroller := get_node_or_null("/root/World/InfiniteScroller")
+	if infinite_scroller and infinite_scroller.has_method("refresh_debug_index_labels_visibility"):
+		infinite_scroller.refresh_debug_index_labels_visibility()
+
+	if DebugLogger.enabled and DebugLogger.debug_input:
+		print("[DBG OVERLAY] debug_visuals_enabled:", WorldConfig.debug_visuals_enabled)
 
 func _unhandled_key_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -131,10 +154,5 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			return
 
 		if is_f2:
-			WorldConfig.debug_visuals_enabled = not WorldConfig.debug_visuals_enabled
-			var plane_guide_control := get_node_or_null("/root/World/PlaneGuide/Control") as Control
-			if plane_guide_control:
-				plane_guide_control.queue_redraw()
-			if DebugLogger.enabled and DebugLogger.debug_input:
-				print("[DBG OVERLAY] debug_visuals_enabled:", WorldConfig.debug_visuals_enabled)
+			_toggle_debug_visuals()
 			get_viewport().set_input_as_handled()

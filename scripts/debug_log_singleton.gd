@@ -6,35 +6,35 @@ extends Node
 
 # ─── Master switch ─────────────────────────────────────────────────────────────
 ## When false, ALL categories are silenced regardless of individual flags.
-var enabled: bool = true
+var enabled: bool = false
 
 # ─── Per-category flags ────────────────────────────────────────────────────────
 ## Moita: reveal, accept, attach, save/restore bush state, rehide, +1 frame log.
-var bush: bool = true
+var bush: bool = false
 
 ## Animal state: save, restore, move between segments, clear_active, replacement, extract.
-var animal_state: bool = true
+var animal_state: bool = false
 
 ## Animal creation: check_missing, create_missing, find_in_bush, rename_fix.
-var animal_create: bool = true
+var animal_create: bool = false
 
 ## Drag & high-level input: drag start/end, bounce, click/hold, bush_drop check.
-var drag: bool = true
+var drag: bool = false
 
 ## Area input callbacks (verbose): animal_area_input, bush_area_input, press state.
-var input: bool = true
+var input: bool = false
 
 ## Plane: sync_to_plane, plane_change, reparent_to_plane.
-var plane: bool = true
+var plane: bool = false
 
 ## Gravity: fall start, cancel, land.
-var gravity: bool = true
+var gravity: bool = false
 
 ## Infinite scroller: segment create and recycle.
-var scroller: bool = true
+var scroller: bool = false
 
 ## Hole (buraco): accept/reject check, animal vs allowed list.
-var hole: bool = true
+var hole: bool = false
 
 ## Sun/Moon: icon creation (size, pivot), position computation (viewport, cam, skyline), place_icons.
 var sun_moon: bool = false
@@ -43,16 +43,16 @@ var sun_moon: bool = false
 var animal_fsm: bool = false
 
 ## Água/submerso: detecção de trigger, overlap, decisões de transição e contexto posicional.
-var water: bool = true
+var water: bool = false
 
 ## Troca de sprite: seleção/aplicação de textura (inclui submerso).
-var sprite: bool = true
+var sprite: bool = false
 
 ## Nuvens/parallax: spawn, reset, wrap, direção, bounds, camada e skyline.
-var clouds: bool = true
+var clouds: bool = false
 
 ## Overlay/input de debug: rastreia o caminho da tecla F1 no pipeline de input.
-var debug_input: bool = true
+var debug_input: bool = false
 
 # ─── Helpers ───────────────────────────────────────────────────────────────────
 

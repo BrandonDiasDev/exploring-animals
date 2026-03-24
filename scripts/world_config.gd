@@ -25,11 +25,11 @@ extends Node
 
 # ── Guia visual de planos (PlaneGuide) ────────────────────────────────────────
 ## Ativa ou desativa o guia visual de planos e dimensões em tela.
-@export var show_plane_guide: bool = true
+@export var show_plane_guide: bool = false
 
 ## Ativa/desativa visualizações de debug em runtime (ex.: linhas e zonas do PlaneGuide).
 ## Não altera a jogabilidade; apenas o desenho dos overlays de debug.
-@export var debug_visuals_enabled: bool = true
+@export var debug_visuals_enabled: bool = false
 
 ## Cor do preenchimento da zona do Plano 2 (fundo).
 @export var guide_plane2_color: Color = Color(0.2, 0.4, 0.9, 0.12)
