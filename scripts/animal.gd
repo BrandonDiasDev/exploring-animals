@@ -57,6 +57,8 @@ var _water_overlap_count: int = 0
 var _water_overlap_ids: Dictionary = {}
 var _last_water_trigger: String = ""
 var _last_water_zone_name: String = ""
+var _water_reconcile_scheduled: bool = false
+var _water_reconcile_reason: String = ""
 ## Textura padrão capturada da cena em _ready(); usada como fallback de IDLE.
 var _default_idle_texture: Texture2D = null
 ## Duração em segundos que o animal permanece acordado após ser perturbado (durante o período de sono).
@@ -71,12 +73,15 @@ func _ready():
 	area.input_event.connect(_on_area_input_event)
 	area.area_entered.connect(_on_area_area_entered)
 	area.area_exited.connect(_on_area_area_exited)
+	area.area_shape_entered.connect(_on_area_area_shape_entered)
+	area.area_shape_exited.connect(_on_area_area_shape_exited)
 	original_position = position
 	
 	# Capturar textura padrão da cena antes de qualquer override FSM.
 	_default_idle_texture = sprite.texture
 	_load_submerged_textures()
 	_configure_water_detection()
+	_debug_log_water_area_setup()
 	
 	if is_hidden:
 		visible = false
@@ -223,17 +228,44 @@ func _configure_water_detection() -> void:
 func resync_water_state(reason: String = "manual") -> void:
 	"""Recalcula sobreposição real de água e reconcilia estado FSM.
 	Útil após restore/reparent/reveal para evitar contador stale."""
+	_reconcile_water_state_now(reason)
+
+func _schedule_water_reconcile(reason: String = "signal") -> void:
+	if not area:
+		return
+	_water_reconcile_reason = reason
+	if _water_reconcile_scheduled:
+		return
+	_water_reconcile_scheduled = true
+	call_deferred("_run_scheduled_water_reconcile")
+
+func _run_scheduled_water_reconcile() -> void:
+	# Eventos de shape/area podem oscilar dentro do mesmo frame.
+	# Esperar o próximo physics_frame dá um snapshot estável de overlaps.
+	await get_tree().physics_frame
+	var reason := _water_reconcile_reason
+	_water_reconcile_scheduled = false
+	_water_reconcile_reason = ""
+	_reconcile_water_state_now("scheduled:" + reason)
+
+func _reconcile_water_state_now(reason: String = "manual") -> void:
+	"""Fonte autoritativa para água: snapshot real de get_overlapping_areas()."""
 	if not area:
 		return
 	var overlap_areas := area.get_overlapping_areas()
 	var new_ids: Dictionary = {}
+	var first_zone_name: String = ""
 	for overlap in overlap_areas:
 		var overlap_area := overlap as Area2D
 		if overlap_area and _is_water_area(overlap_area):
 			new_ids[overlap_area.get_instance_id()] = true
+			if first_zone_name == "":
+				first_zone_name = overlap_area.name
 	var old_count := _water_overlap_count
 	_water_overlap_ids = new_ids
 	_water_overlap_count = _water_overlap_ids.size()
+	if _water_overlap_count > 0 and first_zone_name != "":
+		_last_water_zone_name = first_zone_name
 	if DebugLogger.enabled and DebugLogger.water:
 		print("[WATER RESYNC] ", animal_name,
 			" | reason:", reason,
@@ -260,24 +292,13 @@ func _on_area_area_entered(other_area: Area2D) -> void:
 		if DebugLogger.enabled and DebugLogger.water:
 			print("[WATER ENTER] ", animal_name, " ignored (not water)")
 		return
-	var area_id := other_area.get_instance_id()
-	if _water_overlap_ids.has(area_id):
-		if DebugLogger.enabled and DebugLogger.water:
-			print("[WATER ENTER] ", animal_name,
-				" | duplicate_area_id:", area_id,
-				" | zone:", other_area.name,
-				" | overlap_kept:", _water_overlap_count)
-		return
-	_last_water_trigger = "area_entered"
-	_last_water_zone_name = other_area.name if other_area else "null"
-	_water_overlap_ids[area_id] = true
-	_water_overlap_count = _water_overlap_ids.size()
+	_last_water_trigger = "area_entered_signal"
+	_last_water_zone_name = str(other_area.name) if other_area else "null"
 	if DebugLogger.enabled and DebugLogger.water:
 		print("[WATER ENTER] ", animal_name,
-			" | overlap_after:", _water_overlap_count,
+			" | action:schedule_reconcile",
 			" | zone:", _last_water_zone_name)
-	if _water_overlap_count == 1:
-		_enter_submerged_state()
+	_schedule_water_reconcile("area_entered")
 
 func _on_area_area_exited(other_area: Area2D) -> void:
 	if DebugLogger.enabled and DebugLogger.water:
@@ -291,25 +312,13 @@ func _on_area_area_exited(other_area: Area2D) -> void:
 		if DebugLogger.enabled and DebugLogger.water:
 			print("[WATER EXIT] ", animal_name, " ignored (not water)")
 		return
-	var area_id := other_area.get_instance_id()
-	if _water_overlap_ids.has(area_id):
-		_water_overlap_ids.erase(area_id)
-	else:
-		if DebugLogger.enabled and DebugLogger.water:
-			print("[WATER EXIT] ", animal_name,
-				" | unknown_area_id:", area_id,
-				" | forcing_resync")
-		resync_water_state("unknown_exit")
-		return
-	_last_water_trigger = "area_exited"
-	_last_water_zone_name = other_area.name if other_area else "null"
-	_water_overlap_count = _water_overlap_ids.size()
+	_last_water_trigger = "area_exited_signal"
+	_last_water_zone_name = str(other_area.name) if other_area else "null"
 	if DebugLogger.enabled and DebugLogger.water:
 		print("[WATER EXIT] ", animal_name,
-			" | overlap_after:", _water_overlap_count,
+			" | action:schedule_reconcile",
 			" | zone:", _last_water_zone_name)
-	if _water_overlap_count == 0 and current_state == AnimalState.SUBMERSO:
-		_exit_submerged_state()
+	_schedule_water_reconcile("area_exited")
 
 func _is_water_area(other_area: Area2D) -> bool:
 	if other_area == null:
@@ -418,9 +427,12 @@ func end_drag():
 	z_index = 100 if current_plane == "plane2" else 200
 	
 	emit_signal("animal_drag_ended", self)
+	_debug_log_drop_snapshot("PRE")
 	
 	# Aguardar um frame de física para as sobreposições serem atualizadas
 	await get_tree().physics_frame
+	_debug_log_drop_snapshot("POST")
+	resync_water_state("drop_end")
 	
 	var bush_result = _check_bush_drop()
 	if bush_result == "accepted" or bush_result == "rejected":
@@ -665,6 +677,97 @@ func _describe_area(a: Area2D) -> String:
 		a.collision_mask,
 		str(a.get_groups())
 	]
+
+func _is_ema_debug_target() -> bool:
+	return animal_name == "Ema" or animal_name == "Siriema"
+
+func _is_water_area_quiet(other_area: Area2D) -> bool:
+	if other_area == null:
+		return false
+	if other_area.is_in_group("water_zones"):
+		return true
+	var cfg := get_node_or_null("/root/WorldConfig")
+	if cfg and cfg.has_method("get_water_collision_layer_mask"):
+		var water_mask: int = int(cfg.get_water_collision_layer_mask())
+		return (other_area.collision_layer & water_mask) != 0
+	return false
+
+func _format_shape_debug(shape: Shape2D) -> String:
+	if shape == null:
+		return "null"
+	if shape is RectangleShape2D:
+		return "%s(size=%s)" % [shape.get_class(), str((shape as RectangleShape2D).size)]
+	if shape is CircleShape2D:
+		return "%s(radius=%.2f)" % [shape.get_class(), (shape as CircleShape2D).radius]
+	if shape is CapsuleShape2D:
+		var cap := shape as CapsuleShape2D
+		return "%s(radius=%.2f,height=%.2f)" % [shape.get_class(), cap.radius, cap.height]
+	return shape.get_class()
+
+func _debug_log_water_area_setup() -> void:
+	if not (DebugLogger.enabled and DebugLogger.water and _is_ema_debug_target()):
+		return
+	if not area:
+		print("[WATER AREA SETUP] ", animal_name, " | area:null")
+		return
+	var shape_nodes: Array[CollisionShape2D] = []
+	for child in area.get_children():
+		var shape_node := child as CollisionShape2D
+		if shape_node:
+			shape_nodes.append(shape_node)
+	print("[WATER AREA SETUP] ", animal_name,
+		" | shape_count:", shape_nodes.size(),
+		" | area:", area.name)
+	for shape_node in shape_nodes:
+		print("[WATER AREA SETUP] ", animal_name,
+			" | node:", shape_node.name,
+			" | disabled:", shape_node.disabled,
+			" | local_pos:", shape_node.position,
+			" | shape:", _format_shape_debug(shape_node.shape))
+
+func _debug_log_drop_snapshot(tag: String) -> void:
+	if not (DebugLogger.enabled and DebugLogger.water and _is_ema_debug_target()):
+		return
+	if not area:
+		return
+	var overlap_areas := area.get_overlapping_areas()
+	var overlap_desc: Array[String] = []
+	for overlap in overlap_areas:
+		var overlap_area := overlap as Area2D
+		if overlap_area:
+			overlap_desc.append("%s | water=%s" % [
+				_describe_area(overlap_area),
+				str(_is_water_area_quiet(overlap_area))
+			])
+	print("[DROP SNAP %s] " % tag, animal_name,
+		" | gpos:", global_position,
+		" | feet_y:", "%.1f" % get_feet_y(),
+		" | state:", AnimalState.keys()[current_state],
+		" | overlap_count:", _water_overlap_count,
+		" | overlap_ids:", _water_overlap_ids.size(),
+		" | overlapping_areas:", overlap_desc if not overlap_desc.is_empty() else ["none"])
+
+func _on_area_area_shape_entered(_area_rid: RID, other_area: Area2D, other_area_shape_idx: int, local_shape_idx: int) -> void:
+	if not (DebugLogger.enabled and DebugLogger.water and _is_ema_debug_target()):
+		return
+	print("[WATER SHAPE ENTER] ", animal_name,
+		" | local_shape_idx:", local_shape_idx,
+		" | other_area:", _describe_area(other_area),
+		" | other_shape_idx:", other_area_shape_idx,
+		" | other_is_water:", _is_water_area_quiet(other_area),
+		" | overlap_count:", _water_overlap_count,
+		" | overlap_ids:", _water_overlap_ids.size())
+
+func _on_area_area_shape_exited(_area_rid: RID, other_area: Area2D, other_area_shape_idx: int, local_shape_idx: int) -> void:
+	if not (DebugLogger.enabled and DebugLogger.water and _is_ema_debug_target()):
+		return
+	print("[WATER SHAPE EXIT] ", animal_name,
+		" | local_shape_idx:", local_shape_idx,
+		" | other_area:", _describe_area(other_area),
+		" | other_shape_idx:", other_area_shape_idx,
+		" | other_is_water:", _is_water_area_quiet(other_area),
+		" | overlap_count:", _water_overlap_count,
+		" | overlap_ids:", _water_overlap_ids.size())
 
 func _update_idle_visual() -> void:
 	"""Atualiza a textura do Sprite2D com base no estado dia/noite atual.

@@ -539,7 +539,9 @@ func save_animal_state(animal):
 		"local_position": local_pos,
 		"scale": animal.scale,
 		"is_hidden": animal.is_hidden,
-		"scene_path": scene_path
+		"scene_path": scene_path,
+		"current_state": animal.current_state,
+		"was_in_water": animal.current_state == Animal.AnimalState.SUBMERSO
 	}
 	if DebugLogger.animal_state: print("[SAVE] id:", animal_id, " | scene_index:", scene_index, " | local_pos:", local_pos, " | plane:", animal.current_plane)
 
@@ -930,7 +932,9 @@ func save_animal_state_for_recycle(animal):
 		"local_position": animal.position,
 		"scale": animal.scale,
 		"is_hidden": animal.is_hidden,
-		"scene_path": scene_path
+		"scene_path": scene_path,
+		"current_state": animal.current_state,
+		"was_in_water": animal.current_state == Animal.AnimalState.SUBMERSO
 	}
 	if DebugLogger.animal_state: print("[SAVE RECYCLE] id:", animal_id, "| scene_index:", segment_scene_index, "| local_pos:", animal.position)
 
@@ -1008,6 +1012,7 @@ func restore_animal_state(animal):
 		
 		if animal.has_method("_sync_visual_to_plane"):
 			animal._sync_visual_to_plane()
+		_apply_saved_animal_fsm(animal, state)
 		if animal.has_method("notify_day_night_changed"):
 			animal.notify_day_night_changed(WorldConfig.is_day)
 		
@@ -1037,7 +1042,9 @@ func restore_animal_state(animal):
 				"local_position": animal.position,
 				"scale": animal.scale,
 				"is_hidden": animal.is_hidden,
-				"scene_path": scene_path
+				"scene_path": scene_path,
+				"current_state": animal.current_state,
+				"was_in_water": animal.current_state == Animal.AnimalState.SUBMERSO
 			}
 			if DebugLogger.animal_state: print("[RESTORE] FIRST TIME - Saved initial state | scene_index:", scene_index, "| local_pos:", animal.position)
 			
@@ -1176,6 +1183,30 @@ func _post_restore_animal_state(animal: Animal, reason: String = "") -> void:
 		return
 	if animal.has_method("apply_gravity"):
 		animal.apply_gravity()
+
+func _apply_saved_animal_fsm(animal: Animal, state: Dictionary) -> void:
+	"""Aplica estado FSM salvo como pista inicial; resync de água continua autoritativo."""
+	if not is_instance_valid(animal):
+		return
+	if animal.is_hidden:
+		if animal.has_method("transition_to"):
+			animal.transition_to(Animal.AnimalState.IDLE)
+		return
+	if not state.has("current_state"):
+		return
+	var saved_state = state.get("current_state", Animal.AnimalState.IDLE)
+	if not (saved_state is int):
+		return
+	if not animal.has_method("transition_to"):
+		return
+	match int(saved_state):
+		Animal.AnimalState.SUBMERSO:
+			animal.transition_to(Animal.AnimalState.SUBMERSO)
+		Animal.AnimalState.IDLE:
+			animal.transition_to(Animal.AnimalState.IDLE)
+		_:
+			# Estados transitórios são resolvidos por apply_gravity no pós-restore.
+			animal.transition_to(Animal.AnimalState.IDLE)
 
 # ─── Debug: validação de invariantes ─────────────────────────────────────────
 

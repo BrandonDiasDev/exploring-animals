@@ -41,6 +41,7 @@ func validate(wm: Node, label: String = "", silent: bool = false) -> bool:
 	_check_fsm_hidden_idle(wm)
 	_check_fsm_no_fly_for_ground(wm)
 	_check_fsm_state_valid(wm)
+	_check_water_idle_mismatch(wm)
 
 	var prefix := "[VALIDATOR%s]" % (" <%s>" % label if label != "" else "")
 
@@ -438,4 +439,42 @@ func _check_fsm_state_valid(wm: Node) -> void:
 				"'%s' tem current_state=%s que não é um valor válido de AnimalState (0, 1, 2, 3). "
 				% [key.trim_suffix("_active_node"), str(fsm_state)]
 				+ "Atribuição direta ao campo sem usar transition_to()?"
+			)
+
+
+# ─── Verificação 15 — animal IDLE sobre água ───────────────────────────────
+func _check_water_idle_mismatch(wm: Node) -> void:
+	## Animal visível em IDLE não pode permanecer sobre água.
+	## Essa checagem captura desync entre overlap real e FSM.
+	var animals_state: Dictionary = wm.animals_state
+	for key: String in animals_state.keys():
+		if not key.ends_with("_active_node"):
+			continue
+		var node = animals_state[key]
+		if not is_instance_valid(node):
+			continue
+		if node.get("is_hidden"):
+			continue
+		if not node.get("visible"):
+			continue
+		var fsm_state = node.get("current_state")
+		if fsm_state == null or int(fsm_state) != 0: # 0 = IDLE
+			continue
+		var area = node.get_node_or_null("Area2D")
+		if not area:
+			continue
+		var overlaps: Array = area.get_overlapping_areas()
+		var has_water_overlap := false
+		for overlap in overlaps:
+			var overlap_area := overlap as Area2D
+			if not overlap_area:
+				continue
+			if overlap_area.is_in_group("water_zones"):
+				has_water_overlap = true
+				break
+		if has_water_overlap:
+			errors.append(
+				("'%s' está em IDLE mas Area2D sobrepõe water_zones. "
+				+ "Esperado SUBMERSO após reconciliação.")
+				% [key.trim_suffix("_active_node")]
 			)
