@@ -226,7 +226,7 @@ func _configure_water_detection() -> void:
 				" | new_mask:", area.collision_mask)
 
 func resync_water_state(reason: String = "manual") -> void:
-	"""Recalcula sobreposição real de água e reconcilia estado FSM.
+	"""Recalcula presença de água no ponto dos pés e reconcilia estado FSM.
 	Útil após restore/reparent/reveal para evitar contador stale."""
 	_reconcile_water_state_now(reason)
 
@@ -249,18 +249,14 @@ func _run_scheduled_water_reconcile() -> void:
 	_reconcile_water_state_now("scheduled:" + reason)
 
 func _reconcile_water_state_now(reason: String = "manual") -> void:
-	"""Fonte autoritativa para água: snapshot real de get_overlapping_areas()."""
+	"""Fonte autoritativa para água: ponto dos pés dentro de área de água."""
 	if not area:
 		return
-	var overlap_areas := area.get_overlapping_areas()
-	var new_ids: Dictionary = {}
-	var first_zone_name: String = ""
-	for overlap in overlap_areas:
-		var overlap_area := overlap as Area2D
-		if overlap_area and _is_water_area(overlap_area):
-			new_ids[overlap_area.get_instance_id()] = true
-			if first_zone_name == "":
-				first_zone_name = overlap_area.name
+	var probe := _collect_water_areas_at_feet_point()
+	var new_ids: Dictionary = probe.get("ids", {})
+	var first_zone_name: String = str(probe.get("first_zone_name", ""))
+	var feet_point: Vector2 = probe.get("feet_point", Vector2(global_position.x, get_feet_y()))
+	var raw_hits: int = int(probe.get("raw_hits", 0))
 	var old_count := _water_overlap_count
 	_water_overlap_ids = new_ids
 	_water_overlap_count = _water_overlap_ids.size()
@@ -271,6 +267,8 @@ func _reconcile_water_state_now(reason: String = "manual") -> void:
 			" | reason:", reason,
 			" | old_count:", old_count,
 			" | new_count:", _water_overlap_count,
+			" | feet_point:", feet_point,
+			" | raw_hits:", raw_hits,
 			" | state_before:", AnimalState.keys()[current_state],
 			" | gpos:", global_position,
 			" | feet_y:", "%.1f" % get_feet_y())
@@ -680,6 +678,45 @@ func _describe_area(a: Area2D) -> String:
 
 func _is_ema_debug_target() -> bool:
 	return animal_name == "Ema" or animal_name == "Siriema"
+
+func _collect_water_areas_at_feet_point() -> Dictionary:
+	var feet_point := Vector2(global_position.x, get_feet_y())
+	var result_ids: Dictionary = {}
+	var first_zone_name: String = ""
+	var raw_hits: int = 0
+	var world_2d := get_world_2d()
+	if world_2d == null:
+		return {
+			"ids": result_ids,
+			"first_zone_name": first_zone_name,
+			"feet_point": feet_point,
+			"raw_hits": raw_hits,
+		}
+
+	var query := PhysicsPointQueryParameters2D.new()
+	query.position = feet_point
+	query.collide_with_areas = true
+	query.collide_with_bodies = false
+	query.collision_mask = 0xFFFFFFFF
+
+	var hits: Array = world_2d.direct_space_state.intersect_point(query, 32)
+	raw_hits = hits.size()
+	for hit in hits:
+		var hit_data := hit as Dictionary
+		if hit_data.is_empty():
+			continue
+		var overlap_area := hit_data.get("collider", null) as Area2D
+		if overlap_area and _is_water_area_quiet(overlap_area):
+			result_ids[overlap_area.get_instance_id()] = true
+			if first_zone_name == "":
+				first_zone_name = overlap_area.name
+
+	return {
+		"ids": result_ids,
+		"first_zone_name": first_zone_name,
+		"feet_point": feet_point,
+		"raw_hits": raw_hits,
+	}
 
 func _is_water_area_quiet(other_area: Area2D) -> bool:
 	if other_area == null:

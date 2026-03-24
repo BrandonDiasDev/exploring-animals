@@ -165,6 +165,7 @@ func run_all() -> void:
 	await _run("G16-F — recycle com SUBMERSO mantém validador OK",                 _g16f_recycle_after_submerged_keeps_validator_ok)
 	await _run("G16-G — area_entered duplicado não infla overlap",                  _g16g_duplicate_enter_does_not_inflate_overlap)
 	await _run("G16-H — resync restaura SUBMERSO quando ainda em água",             _g16h_resync_restores_submerged_state)
+	await _run("G16-I — centro na água sem pé não entra em SUBMERSO",               _g16i_center_overlap_without_feet_does_not_submerge)
 
 	_footer()
 
@@ -2018,7 +2019,8 @@ func _g16a_enter_water_sets_submerso() -> void:
 		_skip_test("não foi possível criar water zone de teste")
 		return
 
-	dummy._on_area_area_entered(zone)
+	_move_water_zone_to_feet(zone, dummy)
+	dummy.resync_water_state("test_g16a")
 	_assert(dummy.current_state == Animal.AnimalState.SUBMERSO,
 		"ao entrar na água, estado esperado SUBMERSO")
 
@@ -2038,7 +2040,8 @@ func _g16b_submerged_texture_from_extras() -> void:
 		_skip_test("não foi possível criar water zone de teste")
 		return
 
-	dummy._on_area_area_entered(zone)
+	_move_water_zone_to_feet(zone, dummy)
+	dummy.resync_water_state("test_g16b")
 	var sprite := dummy.get_node_or_null("Sprite2D") as Sprite2D
 	var valid_paths := {
 		"res://assets/extras/olhin-1.png": true,
@@ -2074,12 +2077,14 @@ func _g16c_reentry_keeps_valid_submerged_texture() -> void:
 	}
 	var all_valid := true
 	for _i in range(6):
-		dummy._on_area_area_entered(zone)
+		_move_water_zone_to_feet(zone, dummy)
+		dummy.resync_water_state("test_g16c_enter_%d" % _i)
 		var sprite := dummy.get_node_or_null("Sprite2D") as Sprite2D
 		var tex_path := sprite.texture.resource_path if sprite and sprite.texture else ""
 		if not valid_paths.has(tex_path):
 			all_valid = false
-		dummy._on_area_area_exited(zone)
+		zone.global_position = dummy.global_position + Vector2(0.0, -420.0)
+		dummy.resync_water_state("test_g16c_exit_%d" % _i)
 
 	_assert(all_valid, "todas as entradas na água devem usar uma textura válida de extras")
 
@@ -2104,8 +2109,10 @@ func _g16d_exit_water_restores_flow() -> void:
 		return
 	fly_dummy.can_fly = true
 	fly_dummy.position.y = cfg.background_earth_y - 300.0
-	fly_dummy._on_area_area_entered(zone1)
-	fly_dummy._on_area_area_exited(zone1)
+	_move_water_zone_to_feet(zone1, fly_dummy)
+	fly_dummy.resync_water_state("test_g16d_fly_enter")
+	zone1.global_position = fly_dummy.global_position + Vector2(0.0, -420.0)
+	fly_dummy.resync_water_state("test_g16d_fly_exit")
 	_assert(fly_dummy.current_state == Animal.AnimalState.FLY,
 		"ao sair da água acima do chão com can_fly=true, esperado FLY")
 
@@ -2121,8 +2128,10 @@ func _g16d_exit_water_restores_flow() -> void:
 		return
 	fall_dummy.can_fly = false
 	fall_dummy.position.y = cfg.background_earth_y - 300.0
-	fall_dummy._on_area_area_entered(zone2)
-	fall_dummy._on_area_area_exited(zone2)
+	_move_water_zone_to_feet(zone2, fall_dummy)
+	fall_dummy.resync_water_state("test_g16d_fall_enter")
+	zone2.global_position = fall_dummy.global_position + Vector2(0.0, -420.0)
+	fall_dummy.resync_water_state("test_g16d_fall_exit")
 	_assert(fall_dummy.current_state == Animal.AnimalState.FALL,
 		"ao sair da água acima do chão com can_fly=false, esperado FALL")
 
@@ -2140,8 +2149,10 @@ func _g16d_exit_water_restores_flow() -> void:
 		return
 	idle_dummy.can_fly = true
 	idle_dummy.position.y = cfg.background_earth_y + 240.0
-	idle_dummy._on_area_area_entered(zone3)
-	idle_dummy._on_area_area_exited(zone3)
+	_move_water_zone_to_feet(zone3, idle_dummy)
+	idle_dummy.resync_water_state("test_g16d_idle_enter")
+	zone3.global_position = idle_dummy.global_position + Vector2(0.0, -420.0)
+	idle_dummy.resync_water_state("test_g16d_idle_exit")
 	_assert(idle_dummy.current_state == Animal.AnimalState.IDLE,
 		"ao sair da água no chão, esperado IDLE")
 
@@ -2165,7 +2176,8 @@ func _g16e_day_night_does_not_override_submerged() -> void:
 		_skip_test("não foi possível criar water zone de teste")
 		return
 
-	dummy._on_area_area_entered(zone)
+	_move_water_zone_to_feet(zone, dummy)
+	dummy.resync_water_state("test_g16e")
 	var sprite := dummy.get_node_or_null("Sprite2D") as Sprite2D
 	var before_path := sprite.texture.resource_path if sprite and sprite.texture else ""
 	dummy.notify_day_night_changed(false)
@@ -2191,7 +2203,8 @@ func _g16f_recycle_after_submerged_keeps_validator_ok() -> void:
 		_skip_test("não foi possível criar water zone de teste")
 		return
 
-	animal._on_area_area_entered(zone)
+	_move_water_zone_to_feet(zone, animal)
+	animal.resync_water_state("test_g16f")
 	_assert(animal.current_state == Animal.AnimalState.SUBMERSO,
 		"pré-condição: animal deve entrar em SUBMERSO antes do recycle")
 
@@ -2216,8 +2229,10 @@ func _g16g_duplicate_enter_does_not_inflate_overlap() -> void:
 		_skip_test("não foi possível criar water zone de teste")
 		return
 
+	_move_water_zone_to_feet(zone, dummy)
 	dummy._on_area_area_entered(zone)
 	dummy._on_area_area_entered(zone)
+	dummy.resync_water_state("test_g16g")
 	_assert(dummy.current_state == Animal.AnimalState.SUBMERSO,
 		"com entrada duplicada, estado deve permanecer SUBMERSO")
 	_assert(dummy._water_overlap_count == 1,
@@ -2239,7 +2254,8 @@ func _g16h_resync_restores_submerged_state() -> void:
 		_skip_test("não foi possível criar water zone de teste")
 		return
 
-	dummy._on_area_area_entered(zone)
+	_move_water_zone_to_feet(zone, dummy)
+	dummy.resync_water_state("test_g16h_enter")
 	_assert(dummy.current_state == Animal.AnimalState.SUBMERSO,
 		"pré-condição: animal deveria estar SUBMERSO")
 
@@ -2253,6 +2269,36 @@ func _g16h_resync_restores_submerged_state() -> void:
 		"resync deveria restaurar SUBMERSO quando ainda existe overlap de água")
 	_assert(dummy._water_overlap_count == 1,
 		"resync deveria recomputar overlap_count=1 (atual=%d)" % dummy._water_overlap_count)
+
+	zone.queue_free()
+	dummy.queue_free()
+	await get_tree().process_frame
+
+
+func _g16i_center_overlap_without_feet_does_not_submerge() -> void:
+	var dummy := _instantiate_dummy_animal("__test_g16i__")
+	if not dummy:
+		_skip_test("não foi possível criar animal de teste")
+		return
+	var zone := _instantiate_test_water_zone(dummy.global_position)
+	if not zone:
+		dummy.queue_free()
+		_skip_test("não foi possível criar water zone de teste")
+		return
+
+	# Zona no centro: pode cobrir tronco/corpo, mas não deve cobrir o ponto dos pés.
+	zone.global_position = dummy.global_position
+	dummy.resync_water_state("test_g16i_center")
+	_assert(dummy.current_state != Animal.AnimalState.SUBMERSO,
+		"com água apenas no centro e pé fora, não deveria entrar em SUBMERSO")
+	_assert(dummy._water_overlap_count == 0,
+		"com pé fora da água, overlap_count esperado=0 (atual=%d)" % dummy._water_overlap_count)
+
+	# Controle positivo: ao mover a água para o pé, deve submergir.
+	_move_water_zone_to_feet(zone, dummy)
+	dummy.resync_water_state("test_g16i_feet")
+	_assert(dummy.current_state == Animal.AnimalState.SUBMERSO,
+		"ao mover a zona para o pé, deveria entrar em SUBMERSO")
 
 	zone.queue_free()
 	dummy.queue_free()
@@ -2414,6 +2460,18 @@ func _instantiate_test_water_zone(global_pos: Vector2) -> Area2D:
 	add_child(zone)
 	zone.global_position = global_pos
 	return zone
+
+
+func _move_water_zone_to_feet(zone: Area2D, animal: Node, y_offset: float = 0.0) -> void:
+	if not zone or not animal:
+		return
+	var animal_2d := animal as Node2D
+	if not animal_2d:
+		return
+	var feet_y: float = animal_2d.global_position.y
+	if animal.has_method("get_feet_y"):
+		feet_y = float(animal.get_feet_y())
+	zone.global_position = Vector2(animal_2d.global_position.x, feet_y + y_offset)
 
 
 func _is_bush_in_active_segment(bush: Node) -> bool:
